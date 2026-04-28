@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sortui"
+version = "0.1.0"
+description = "Terminal visualiser for sorting algorithms"
+readme = "README.md"
+license = {file = "LICENSE"}
+requires-python = ">=3.10"
+authors = [{name = "sortui contributors", email = "sortui@example.com"}]
+keywords = ["sorting", "algorithms", "terminal", "tui", "visualiser", "curses", "education"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console :: Curses",
+    "Intended Audience :: Education",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Education",
+    "Topic :: Terminals",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "pytest-cov", "pre-commit", "ruff", "mypy"]
+
+[project.scripts]
+sortui = "sortui.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/yourusername/sortui"
+Repository = "https://github.com/yourusername/sortui"
+Issues = "https://github.com/yourusername/sortui/issues"
+Changelog = "https://github.com/yourusername/sortui/CHANGELOG.md"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["sortui*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = false
+ignore_missing_imports = true
