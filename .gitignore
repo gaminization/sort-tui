@@ -206,3 +206,14 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+__pycache__/
+*.pyc
+*.pyo
+dist/
+build/
+*.egg-info/
+.coverage
+htmlcov/
+.mypy_cache/
+*.whl
+sortui_debug.log
