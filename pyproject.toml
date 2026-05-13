@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sortui"
-version = "0.1.0"
+version = "0.1.1"
 description = "Terminal visualiser for sorting algorithms"
 readme = "README.md"
 license = {file = "LICENSE"}
