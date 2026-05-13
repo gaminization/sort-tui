@@ -71,6 +71,9 @@ class ProxmapSort(SortAlgorithm):
                 out += 1
         yield done_frame(arr, self.name)
 
+    def get_invariant(self) -> str:
+        return "Each element's proxmap value gives its approximate final position; collisions are resolved by insertion sort."
+
 
 class InPlaceRadixSort(SortAlgorithm):
     name = "In-place Radix Sort"
@@ -84,38 +87,68 @@ class InPlaceRadixSort(SortAlgorithm):
         if not arr:
             yield done_frame(arr, self.name)
             return
-        # STRETCH: The visual pass follows bucket cycles but uses temporary
-        # bucket lists for correctness on arbitrary Python integer objects.
         offset = -min(0, min(value_of(v) for v in arr))
         max_key = max(value_of(v) + offset for v in arr)
         exp = 1
         while exp <= max(1, max_key):
-            buckets: list[list[Any]] = [[] for _ in range(10)]
+            counts = [0] * 10
             for index, value in enumerate(arr):
                 digit = ((value_of(value) + offset) // exp) % 10
-                buckets[digit].append(value)
+                counts[digit] += 1
                 yield base_frame(
                     arr,
                     highlighted=[index],
-                    explanation=f"{self.name}: following cycle start {index} for digit {exp}.",
+                    explanation=f"{self.name}: counting digit {digit} at position {exp} before cycle placement.",
                     operation="read",
-                    metadata={"digit": exp, "cycle_start": index},
+                    metadata={"digit": exp, "cycle_start": index, "counts": counts[:]},
                 )
-            order = range(10) if ascending else range(9, -1, -1)
-            out = 0
-            for digit in order:
-                for value in buckets[digit]:
-                    arr[out] = value
+            starts = [0] * 10
+            total = 0
+            digit_order = list(range(10)) if ascending else list(range(9, -1, -1))
+            for digit in digit_order:
+                starts[digit] = total
+                total += counts[digit]
+                yield base_frame(
+                    arr,
+                    highlighted=[],
+                    explanation=f"{self.name}: digit {digit} owns in-place range starting at {starts[digit]}.",
+                    operation="read",
+                    metadata={"digit": exp, "cycle_start": starts[digit], "counts": counts[:], "starts": starts[:]},
+                )
+
+            next_free = starts[:]
+            targets = [0] * len(arr)
+            for index, value in enumerate(arr):
+                digit = ((value_of(value) + offset) // exp) % 10
+                targets[index] = next_free[digit]
+                next_free[digit] += 1
+                yield base_frame(
+                    arr,
+                    highlighted=[index],
+                    explanation=f"{self.name}: assigning index {index} to cycle target {targets[index]} for digit {digit}.",
+                    operation="read",
+                    metadata={"digit": exp, "cycle_start": index, "targets_ready": index + 1},
+                )
+
+            for cycle_start in range(len(arr)):
+                while targets[cycle_start] != cycle_start:
+                    target = targets[cycle_start]
+                    digit = ((value_of(arr[cycle_start]) + offset) // exp) % 10
+                    arr[cycle_start], arr[target] = arr[target], arr[cycle_start]
+                    targets[cycle_start], targets[target] = targets[target], targets[cycle_start]
                     yield base_frame(
                         arr,
-                        swapped=[out],
-                        explanation=f"{self.name}: cycling value into digit bucket {digit}.",
-                        operation="write",
-                        metadata={"digit": exp, "cycle_start": out},
+                        highlighted=[cycle_start, target],
+                        swapped=[cycle_start, target],
+                        explanation=f"{self.name}: cycle-following digit {digit} swaps index {cycle_start} with target {target}.",
+                        operation="swap",
+                        metadata={"digit": exp, "cycle_start": cycle_start, "counts": counts[:]},
                     )
-                    out += 1
             exp *= 10
         yield done_frame(arr, self.name)
+
+    def get_invariant(self) -> str:
+        return "After each digit pass, elements occupy their correct relative positions for that digit without auxiliary space."
 
 
 class BinaryQuickSort(SortAlgorithm):
@@ -167,6 +200,9 @@ class BinaryQuickSort(SortAlgorithm):
         yield from self._binary(arr, lo, split, bit - 1, ascending, depth + 1)
         yield from self._binary(arr, split, hi, bit - 1, ascending, depth + 1)
 
+    def get_invariant(self) -> str:
+        return "Elements are partitioned by the current bit; the zero-bit partition precedes the one-bit partition."
+
 
 class KirkpatrickReischSort(SortAlgorithm):
     name = "Kirkpatrick-Reisch Sort"
@@ -177,45 +213,74 @@ class KirkpatrickReischSort(SortAlgorithm):
     description = "Fusion-tree-inspired block sort with priority-queue merge."
 
     def sort(self, arr: List[int], ascending: bool = True) -> Generator[SortFrame, None, None]:
-        n = len(arr)
-        block_size = max(1, int(math.log2(max(2, n))))
-        blocks: list[list[Any]] = []
-        for block, start in enumerate(range(0, n, block_size)):
-            values = sorted_values(arr[start : start + block_size], ascending)
-            blocks.append(values)
-            for offset, value in enumerate(values):
-                arr[start + offset] = value
+        if not arr:
+            yield done_frame(arr, self.name)
+            return
+        min_val = min(value_of(value) for value in arr)
+        max_key = max(value_of(value) - min_val for value in arr)
+        top_bit = max(0, max_key.bit_length() - 1)
+
+        def reduce(lo: int, hi: int, bit: int, depth: int) -> Generator[SortFrame, None, None]:
+            if hi - lo <= 1 or bit < 0:
+                return
+            group_bits = max(1, int(math.sqrt(bit + 1)))
+            shift = max(0, bit - group_bits + 1)
+            bucket_count = 1 << (bit - shift + 1)
+            buckets: list[list[Any]] = [[] for _ in range(bucket_count)]
+            for index in range(lo, hi):
+                reduced_key = ((value_of(arr[index]) - min_val) >> shift) & (bucket_count - 1)
+                buckets[reduced_key].append(arr[index])
                 yield base_frame(
                     arr,
-                    swapped=[start + offset],
-                    aux_array=values,
-                    explanation=f"{self.name}: counting-sorting block {block}.",
-                    operation="write",
-                    metadata={"block_size": block_size, "block": block, "phase": "block_sort"},
+                    highlighted=[index],
+                    partition_bounds=(lo, hi - 1),
+                    recursion_depth=depth,
+                    aux_array=[len(bucket) for bucket in buckets],
+                    explanation=(
+                        f"{self.name}: reducing universe bits {bit}..{shift} "
+                        f"into bucket {reduced_key}."
+                    ),
+                    operation="read",
+                    metadata={
+                        "block_size": group_bits,
+                        "block": reduced_key,
+                        "phase": "universe_reduce",
+                        "bit": bit,
+                    },
                 )
-        heap: list[tuple[int, int, int, Any]] = []
-        for block, values in enumerate(blocks):
-            if values:
-                priority = value_of(values[0]) if ascending else -value_of(values[0])
-                heapq.heappush(heap, (priority, block, 0, values[0]))
-        out = 0
-        while heap:
-            _priority, block, index, value = heapq.heappop(heap)
-            arr[out] = value
-            yield base_frame(
-                arr,
-                swapped=[out],
-                explanation=f"{self.name}: priority-queue merging block {block}.",
-                operation="write",
-                metadata={"block_size": block_size, "block": block, "phase": "merge"},
-            )
-            out += 1
-            next_index = index + 1
-            if next_index < len(blocks[block]):
-                next_value = blocks[block][next_index]
-                priority = value_of(next_value) if ascending else -value_of(next_value)
-                heapq.heappush(heap, (priority, block, next_index, next_value))
+            order = range(bucket_count) if ascending else range(bucket_count - 1, -1, -1)
+            bounds: list[tuple[int, int]] = []
+            out = lo
+            for bucket in order:
+                start = out
+                for value in buckets[bucket]:
+                    arr[out] = value
+                    yield base_frame(
+                        arr,
+                        swapped=[out],
+                        partition_bounds=(lo, hi - 1),
+                        recursion_depth=depth,
+                        aux_array=[len(bucket_values) for bucket_values in buckets],
+                        explanation=f"{self.name}: writing reduced-universe bucket {bucket}.",
+                        operation="write",
+                        metadata={
+                            "block_size": group_bits,
+                            "block": bucket,
+                            "phase": "bucket_write",
+                            "bit": bit,
+                        },
+                    )
+                    out += 1
+                if out - start > 1:
+                    bounds.append((start, out))
+            for start, end in bounds:
+                yield from reduce(start, end, shift - 1, depth + 1)
+
+        yield from reduce(0, len(arr), top_bit, 0)
         yield done_frame(arr, self.name)
+
+    def get_invariant(self) -> str:
+        return "Each recursive level reduces the universe size; elements in the same reduced bucket share a digit prefix."
 
 
 _ITEMS = [

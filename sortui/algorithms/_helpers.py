@@ -471,6 +471,57 @@ def odd_even_network(
             break
 
 
+def compare_exchange_network(
+    arr: list[Any],
+    ascending: bool,
+    name: str,
+    *,
+    wire_count: int,
+    comparators: Iterable[tuple[int, int, bool, dict[str, Any], str]],
+) -> Generator[SortFrame, None, None]:
+    sentinel = object()
+    work = arr[:] + [sentinel] * max(0, wire_count - len(arr))
+
+    def priority(item: Any, direction: bool) -> float:
+        if item is sentinel:
+            sentinel_key = math.inf if ascending else -math.inf
+            return sentinel_key if direction else -sentinel_key
+        key = value_of(item)
+        return key if direction else -key
+
+    def sync_array() -> None:
+        arr[:] = [item for item in work if item is not sentinel]
+
+    def visible_index(wire: int) -> int | None:
+        if wire < 0 or wire >= len(work) or work[wire] is sentinel:
+            return None
+        return sum(1 for item in work[: wire + 1] if item is not sentinel) - 1
+
+    for left, right, direction, metadata, explanation in comparators:
+        if left >= len(work) or right >= len(work):
+            continue
+        direction = direction if ascending else not direction
+        highlighted = [idx for idx in (visible_index(left), visible_index(right)) if idx is not None]
+        yield base_frame(
+            arr,
+            highlighted=highlighted,
+            explanation=explanation or f"{name}: comparing network wires {left} and {right}.",
+            operation="compare",
+            metadata=metadata,
+        )
+        if priority(work[left], direction) > priority(work[right], direction):
+            work[left], work[right] = work[right], work[left]
+            sync_array()
+            swapped = [idx for idx in (visible_index(left), visible_index(right)) if idx is not None]
+            yield base_frame(
+                arr,
+                swapped=swapped,
+                explanation=f"{name}: exchanging network wires {left} and {right}.",
+                operation="swap",
+                metadata=metadata,
+            )
+
+
 def split_threads(n: int, count: int = 4, active: int | None = None) -> list[dict[str, Any]]:
     threads: list[dict[str, Any]] = []
     chunk = max(1, math.ceil(n / max(1, count)))

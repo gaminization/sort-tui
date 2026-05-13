@@ -45,3 +45,6 @@ class ExchangeSort(SortAlgorithm):
             explanation="Array is fully sorted.",
             operation="done",
         )
+
+    def get_invariant(self) -> str:
+        return "Each pass bubbles the largest unsorted element to the boundary of the unsorted region."

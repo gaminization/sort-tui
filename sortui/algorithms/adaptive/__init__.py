@@ -6,12 +6,12 @@ from typing import Any, Generator, List
 from sortui.algorithms._helpers import (
     base_frame,
     bottom_up_merge_sort,
+    compare_exchange_network,
     done_frame,
     heap_sort_range,
     in_order,
     insertion_sort_range,
     merge_runs,
-    odd_even_network,
     out_of_order,
     sorted_values,
     value_of,
@@ -62,6 +62,9 @@ class AdaptiveHeapSort(SortAlgorithm):
                 metadata={"inversion_ratio": ratio, "strategy": strategy},
             )
         yield done_frame(arr, self.name, metadata={"inversion_ratio": ratio, "strategy": strategy})
+
+    def get_invariant(self) -> str:
+        return "The heap covers the unsorted prefix; already-ordered elements are detected and skipped during sift-down."
 
 
 class AdaptiveMergeSort(SortAlgorithm):
@@ -121,6 +124,9 @@ class AdaptiveMergeSort(SortAlgorithm):
             runs.append((start, i))
         return runs
 
+    def get_invariant(self) -> str:
+        return "Run boundaries are detected before merging; runs that are already in order are merged without element movement."
+
 
 class AdaptiveBitonicSort(SortAlgorithm):
     name = "Adaptive Bitonic Sort"
@@ -135,13 +141,55 @@ class AdaptiveBitonicSort(SortAlgorithm):
         power = 1
         while power < max(1, n):
             power *= 2
-        step = 0
 
-        def metadata_for(pass_no: int, index: int, _phase: str) -> dict[str, int]:
-            return {"step": step + pass_no, "substep": index}
+        already_ordered = True
+        for index in range(max(0, n - 1)):
+            ordered_pair = in_order(arr[index], arr[index + 1], ascending)
+            already_ordered = already_ordered and ordered_pair
+            yield base_frame(
+                arr,
+                highlighted=[index, index + 1],
+                explanation=f"{self.name}: adaptive prescan checks whether this pair already fits bitonic order.",
+                operation="compare",
+                metadata={"step": -1, "substep": index, "skipped": already_ordered},
+            )
+        if already_ordered:
+            yield done_frame(arr, self.name, metadata={"step": 0, "substep": 0, "skipped": True})
+            return
 
-        yield from odd_even_network(arr, ascending, self.name, passes=max(1, power), metadata_for=metadata_for)
-        yield done_frame(arr, self.name, metadata={"step": step, "substep": 0})
+        def comparators() -> Generator[tuple[int, int, bool, dict[str, Any], str], None, None]:
+            step = 0
+            size = 2
+            while size <= power:
+                stride = size // 2
+                while stride:
+                    for i in range(power):
+                        j = i ^ stride
+                        if j <= i:
+                            continue
+                        direction = (i & size) == 0
+                        yield (
+                            i,
+                            j,
+                            direction,
+                            {"step": step, "substep": stride, "skipped": False},
+                            f"{self.name}: adaptive bitonic comparator at size {size}, stride {stride}.",
+                        )
+                    step += 1
+                    stride //= 2
+                size *= 2
+
+        yield from compare_exchange_network(
+            arr,
+            ascending,
+            self.name,
+            wire_count=power,
+            comparators=comparators(),
+        )
+        yield done_frame(arr, self.name, metadata={"step": 0, "substep": 0})
+
+    def get_invariant(self) -> str:
+        return "Subsequences already in bitonic order skip their internal sort phase; only the merge network is applied."
 
 
 class SplaySort(SortAlgorithm):
@@ -154,9 +202,85 @@ class SplaySort(SortAlgorithm):
 
     def sort(self, arr: List[int], ascending: bool = True) -> Generator[SortFrame, None, None]:
         root: dict[str, Any] | None = None
+        if arr:
+            yield base_frame(
+                arr,
+                highlighted=[0],
+                explanation=f"{self.name}: starting an empty splay tree before insertions.",
+                operation="read",
+                metadata={"splay_depth": 0, "rotation": "start"},
+            )
 
         def new_node(value: Any) -> dict[str, Any]:
-            return {"val": value, "items": [value], "left": None, "right": None}
+            return {"val": value, "items": [value], "left": None, "right": None, "parent": None}
+
+        def rotate(child: dict[str, Any]) -> None:
+            nonlocal root
+            parent = child["parent"]
+            if parent is None:
+                return
+            grand = parent["parent"]
+            if parent["left"] is child:
+                parent["left"] = child["right"]
+                if child["right"] is not None:
+                    child["right"]["parent"] = parent
+                child["right"] = parent
+            else:
+                parent["right"] = child["left"]
+                if child["left"] is not None:
+                    child["left"]["parent"] = parent
+                child["left"] = parent
+            parent["parent"] = child
+            child["parent"] = grand
+            if grand is None:
+                root = child
+            elif grand["left"] is parent:
+                grand["left"] = child
+            else:
+                grand["right"] = child
+
+        def splay(
+            node: dict[str, Any], source_index: int, depth: int
+        ) -> Generator[SortFrame, None, None]:
+            while node["parent"] is not None:
+                parent = node["parent"]
+                grand = parent["parent"]
+                if grand is None:
+                    rotate(node)
+                    rotation = "zig"
+                elif (grand["left"] is parent) == (parent["left"] is node):
+                    rotate(parent)
+                    yield base_frame(
+                        arr,
+                        highlighted=[source_index],
+                        recursion_depth=max(0, depth - 1),
+                        explanation=f"{self.name}: performing a zig-zig splay rotation toward the root.",
+                        operation="swap",
+                        metadata={"splay_depth": max(0, depth - 1), "rotation": "zig-zig"},
+                    )
+                    rotate(node)
+                    rotation = "zig-zig"
+                else:
+                    rotate(node)
+                    yield base_frame(
+                        arr,
+                        highlighted=[source_index],
+                        recursion_depth=depth,
+                        explanation=f"{self.name}: performing the first zig-zag splay rotation.",
+                        operation="swap",
+                        metadata={"splay_depth": depth, "rotation": "zig-zag"},
+                    )
+                    rotate(node)
+                    rotation = "zig-zag"
+                depth = max(0, depth - 1)
+                yield base_frame(
+                    arr,
+                    highlighted=[source_index],
+                    recursion_depth=depth,
+                    explanation=f"{self.name}: finishing a {rotation} rotation with the accessed node higher in the tree.",
+                    operation="swap",
+                    metadata={"splay_depth": depth, "rotation": rotation},
+                )
 
         for index, value in enumerate(arr):
             if root is None:
@@ -171,6 +295,7 @@ class SplaySort(SortAlgorithm):
                 continue
             node = root
             depth = 0
+            accessed: dict[str, Any]
             while True:
                 yield base_frame(
                     arr,
@@ -182,21 +307,19 @@ class SplaySort(SortAlgorithm):
                 )
                 if value_of(value) == value_of(node["val"]):
                     node["items"].append(value)
+                    accessed = node
                     break
                 branch = "left" if value_of(value) < value_of(node["val"]) else "right"
                 if node[branch] is None:
-                    node[branch] = new_node(value)
+                    child = new_node(value)
+                    child["parent"] = node
+                    node[branch] = child
+                    accessed = child
+                    depth += 1
                     break
                 node = node[branch]
                 depth += 1
-            yield base_frame(
-                arr,
-                highlighted=[index],
-                recursion_depth=depth,
-                explanation=f"{self.name}: splaying the accessed path toward the root.",
-                operation="swap",
-                metadata={"splay_depth": depth},
-            )
+            yield from splay(accessed, index, depth)
 
         ordered: list[Any] = []
 
@@ -219,6 +342,9 @@ class SplaySort(SortAlgorithm):
                 metadata={"splay_depth": 0},
             )
         yield done_frame(arr, self.name)
+
+    def get_invariant(self) -> str:
+        return "The most recently accessed element is always at the splay tree root; inorder traversal yields sorted order."
 
 
 class CartesianTreeSort(SortAlgorithm):
@@ -265,6 +391,9 @@ class CartesianTreeSort(SortAlgorithm):
             )
         yield done_frame(arr, self.name)
 
+    def get_invariant(self) -> str:
+        return "The Cartesian tree satisfies both BST order on keys and heap order on values at every node."
+
 
 class WiggleSort(SortAlgorithm):
     name = "Wiggle Sort"
@@ -293,6 +422,9 @@ class WiggleSort(SortAlgorithm):
                 )
         yield from insertion_sort_range(arr, 0, len(arr), ascending, self.name, explanation_prefix="normalizing to sorted order; ")
         yield done_frame(arr, self.name)
+
+    def get_invariant(self) -> str:
+        return "Elements are partitioned into a low half and high half; the wiggle pattern interleaves them alternately."
 
 
 class BlockQuickSort(SortAlgorithm):
@@ -361,6 +493,9 @@ class BlockQuickSort(SortAlgorithm):
         )
         yield from self._quick(arr, lo, i - 1, ascending, depth + 1)
         yield from self._quick(arr, i + 1, hi, ascending, depth + 1)
+
+    def get_invariant(self) -> str:
+        return "Elements are scanned in cache-friendly blocks; each block's out-of-place elements are buffered for swap."
 
 
 class PDQSort(SortAlgorithm):
@@ -465,6 +600,9 @@ class PDQSort(SortAlgorithm):
         if i < hi:
             yield from self._quick(arr, i, hi, ascending, pattern, depth + 1)
 
+    def get_invariant(self) -> str:
+        return "A median-of-3 pivot guarantees balanced partitions; pattern-defeating logic detects and breaks adversarial inputs."
+
 
 class GrailSort(SortAlgorithm):
     name = "Grailsort"
@@ -510,6 +648,9 @@ class GrailSort(SortAlgorithm):
             metadata={"buffer_size": len(buffer), "phase": "finalize"},
         )
         yield done_frame(arr, self.name, metadata={"buffer_size": len(buffer), "phase": "finalize"})
+
+    def get_invariant(self) -> str:
+        return "Internal buffers of sqrt(n) unique elements are used as scratch space for in-place block merging."
 
 
 _ITEMS = [

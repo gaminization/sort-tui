@@ -35,6 +35,9 @@ class MergeSort(SortAlgorithm):
         yield from bottom_up_merge_sort(arr, ascending, self.name)
         yield done_frame(arr, self.name)
 
+    def get_invariant(self) -> str:
+        return "Each recursive call produces a sorted subarray; merging two sorted halves produces a larger sorted subarray."
+
 
 class InPlaceMergeSort(SortAlgorithm):
     name = "In-place Merge Sort"
@@ -85,6 +88,9 @@ class InPlaceMergeSort(SortAlgorithm):
 
         yield from sort_rec(0, n, 0)
         yield done_frame(arr, self.name)
+
+    def get_invariant(self) -> str:
+        return "Elements in arr[lo..mid] and arr[mid+1..hi] are each sorted; the merged region grows without auxiliary space."
 
 
 class QuickSort(SortAlgorithm):
@@ -155,6 +161,9 @@ class QuickSort(SortAlgorithm):
     def get_worst_case_array(self, size: int) -> List[int]:
         return list(range(size))
 
+    def get_invariant(self) -> str:
+        return "All elements left of pivot are <= pivot; all elements right of pivot are >= pivot after each partition."
+
 
 class HeapSort(SortAlgorithm):
     name = "Heapsort"
@@ -167,6 +176,9 @@ class HeapSort(SortAlgorithm):
     def sort(self, arr: List[int], ascending: bool = True) -> Generator[SortFrame, None, None]:
         yield from heap_sort_range(arr, 0, len(arr), ascending, self.name)
         yield done_frame(arr, self.name)
+
+    def get_invariant(self) -> str:
+        return "arr[i..n-1] satisfies the max-heap property; arr[0..i-1] contains the i largest elements in sorted order."
 
 
 class ShellSort(SortAlgorithm):
@@ -225,6 +237,9 @@ class ShellSort(SortAlgorithm):
     def get_worst_case_array(self, size: int) -> List[int]:
         return list(range(size, 0, -1))
 
+    def get_invariant(self) -> str:
+        return "The array is h-sorted for every gap value h used so far; smaller gaps refine the existing order."
+
 
 class CombSort(SortAlgorithm):
     name = "Comb Sort"
@@ -260,6 +275,9 @@ class CombSort(SortAlgorithm):
                         metadata={"gap": gap},
                     )
         yield done_frame(arr, self.name)
+
+    def get_invariant(self) -> str:
+        return "No pair of elements separated by the current gap is out of order; gap shrinks by factor 1.3 each pass."
 
 
 class TreeSort(SortAlgorithm):
@@ -328,6 +346,9 @@ class TreeSort(SortAlgorithm):
             )
         yield done_frame(arr, self.name)
 
+    def get_invariant(self) -> str:
+        return "The BST contains all elements seen so far; its inorder traversal yields elements in sorted order."
+
 
 def strictly_tree_before(left: Any, right: Any, ascending: bool = True) -> bool:
     return value_of(left) < value_of(right) if ascending else value_of(left) > value_of(right)
@@ -393,6 +414,9 @@ class TournamentSort(SortAlgorithm):
                 pos //= 2
         yield done_frame(arr, self.name)
 
+    def get_invariant(self) -> str:
+        return "The tournament tree always holds the current minimum in its root across the remaining unsorted elements."
+
 
 class BlockSort(SortAlgorithm):
     name = "Block Sort"
@@ -434,6 +458,9 @@ class BlockSort(SortAlgorithm):
             width *= 2
         yield done_frame(arr, self.name)
 
+    def get_invariant(self) -> str:
+        return "Each block of sqrt(n) elements is internally sorted; the block boundaries define a coarse sorted order."
+
 
 class SmoothSort(SortAlgorithm):
     name = "Smoothsort"
@@ -467,6 +494,9 @@ class SmoothSort(SortAlgorithm):
             metadata=lambda _op, _idx: {"leonardo": [x for x in leonardo if x <= len(arr)]},
         )
         yield done_frame(arr, self.name)
+
+    def get_invariant(self) -> str:
+        return "The heap covers exactly the unsorted prefix; each extraction extends the sorted suffix by one element."
 
 
 class PatienceSort(SortAlgorithm):
@@ -539,6 +569,9 @@ class PatienceSort(SortAlgorithm):
                 heapq.heappush(heap, (priority, original_index, pile_index, top))
         yield done_frame(arr, self.name)
 
+    def get_invariant(self) -> str:
+        return "Each pile's top card is the smallest card in that pile; piles are maintained in increasing order of top card."
+
 
 class CubeSort(SortAlgorithm):
     name = "Cube Sort"
@@ -601,6 +634,9 @@ class CubeSort(SortAlgorithm):
             runs = new_runs
         yield done_frame(arr, self.name)
 
+    def get_invariant(self) -> str:
+        return "Elements are distributed into a sorted cube structure; each dimension refines the global sorted order."
+
 
 class LibrarySort(SortAlgorithm):
     name = "Library Sort"
@@ -655,6 +691,9 @@ class LibrarySort(SortAlgorithm):
                 operation="write",
             )
         yield done_frame(arr, self.name)
+
+    def get_invariant(self) -> str:
+        return "Gaps between inserted elements leave room for future insertions; all placed elements are in sorted relative order."
 
 
 _ITEMS = [

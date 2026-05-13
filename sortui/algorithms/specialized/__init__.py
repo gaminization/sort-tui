@@ -4,10 +4,9 @@ from typing import Any, Generator, List
 
 from sortui.algorithms._helpers import (
     base_frame,
-    bottom_up_merge_sort,
+    compare_exchange_network,
     done_frame,
     insertion_sort_range,
-    odd_even_network,
     out_of_order,
     sorted_values,
     value_of,
@@ -66,6 +65,9 @@ class ThreeWayMergeSort(SortAlgorithm):
                 operation="write",
             )
 
+    def get_invariant(self) -> str:
+        return "Three sorted runs are merged simultaneously; the minimum across three run-front pointers advances each step."
+
 
 class FranceschinisSort(SortAlgorithm):
     name = "Franceschini's Sort"
@@ -76,10 +78,48 @@ class FranceschinisSort(SortAlgorithm):
     description = "In-place stable merge sort approximation inspired by Franceschini's algorithm."
 
     def sort(self, arr: List[int], ascending: bool = True) -> Generator[SortFrame, None, None]:
-        # STRETCH: Full Franceschini sorting is intricate; this uses stable
-        # merge passes with explicit in-place-themed annotations.
-        yield from bottom_up_merge_sort(arr, ascending, self.name)
+        # STRETCH: Full Franceschini sorting uses a sophisticated constant-
+        # workspace block strategy; this keeps the visible constraint by
+        # merging with stable in-place rotations and no auxiliary array.
+        n = len(arr)
+        width = 1
+        pass_no = 0
+        while width < n:
+            for left in range(0, n, 2 * width):
+                mid = min(left + width, n)
+                right = min(left + 2 * width, n)
+                i, j = left, mid
+                while i < j and j < right:
+                    yield base_frame(
+                        arr,
+                        highlighted=[i, j],
+                        partition_bounds=(left, right - 1),
+                        explanation=f"{self.name}: comparing two adjacent in-place merge blocks.",
+                        operation="compare",
+                        metadata={"phase": "merge", "block_size": width, "pass": pass_no},
+                    )
+                    if not out_of_order(arr[i], arr[j], ascending):
+                        i += 1
+                        continue
+                    for k in range(j, i, -1):
+                        arr[k], arr[k - 1] = arr[k - 1], arr[k]
+                        yield base_frame(
+                            arr,
+                            swapped=[k - 1, k],
+                            partition_bounds=(left, right - 1),
+                            explanation=f"{self.name}: rotating a right-block value left without auxiliary storage.",
+                            operation="swap",
+                            metadata={"phase": "rotate", "block_size": width, "pass": pass_no},
+                        )
+                    i += 1
+                    j += 1
+                    mid += 1
+            width *= 2
+            pass_no += 1
         yield done_frame(arr, self.name)
+
+    def get_invariant(self) -> str:
+        return "Two sorted halves are merged in-place by block rotation; no auxiliary array is used at any point."
 
 
 class MergeInsertionSort(SortAlgorithm):
@@ -109,6 +149,9 @@ class MergeInsertionSort(SortAlgorithm):
         yield from insertion_sort_range(arr, 0, len(arr), ascending, self.name)
         yield done_frame(arr, self.name)
 
+    def get_invariant(self) -> str:
+        return "Large elements are paired and sorted; small partners are then binary-inserted into the sorted sequence."
+
 
 class BeadSort(SortAlgorithm):
     name = "Bead Sort"
@@ -119,29 +162,68 @@ class BeadSort(SortAlgorithm):
     description = "Gravity/bead-inspired counting sort for non-negative rods."
 
     def sort(self, arr: List[int], ascending: bool = True) -> Generator[SortFrame, None, None]:
+        if not arr:
+            yield done_frame(arr, self.name)
+            return
         rods: dict[int, list[Any]] = {}
         for index, value in enumerate(arr):
             rods.setdefault(value_of(value), []).append(value)
             yield base_frame(
                 arr,
                 highlighted=[index],
-                aux_array=[len(values) for values in rods.values()],
-                explanation=f"{self.name}: dropping beads for rod length {value}.",
+                aux_array=[value_of(item) for item in arr],
+                explanation=f"{self.name}: creating a bead rod of length {value}.",
                 operation="read",
-                metadata={"phase": "drop"},
+                metadata={"phase": "rod", "rod": value_of(value)},
             )
-        ordered = sorted_values(arr, ascending)
-        for index, value in enumerate(ordered):
-            arr[index] = value
+
+        max_length = max(value_of(value) for value in arr)
+        column_counts: list[int] = []
+        for column in range(1, max_length + 1):
+            count = sum(1 for value in arr if value_of(value) >= column)
+            column_counts.append(count)
             yield base_frame(
                 arr,
-                swapped=[index],
-                aux_array=ordered,
-                explanation=f"{self.name}: reading bead columns back into sorted order.",
-                operation="write",
-                metadata={"phase": "read"},
+                highlighted=[],
+                aux_array=column_counts,
+                explanation=f"{self.name}: gravity lets beads fall in column {column}; {count} beads remain.",
+                operation="read",
+                metadata={"phase": "gravity", "column": column, "beads": count},
             )
+
+        fallen_lengths = [0] * len(arr)
+        for count in column_counts:
+            for row in range(count):
+                fallen_lengths[row] += 1
+        visual_lengths = fallen_lengths[:] if not ascending else list(reversed(fallen_lengths))
+        for index, length in enumerate(visual_lengths):
+            yield base_frame(
+                arr,
+                highlighted=[index],
+                aux_array=visual_lengths,
+                explanation=f"{self.name}: reading fallen bead row {index} as rod length {length}.",
+                operation="read",
+                metadata={"phase": "read_rows", "rod": length},
+            )
+
+        value_order = sorted(rods, reverse=not ascending)
+        out = 0
+        for length in value_order:
+            for value in rods[length]:
+                arr[out] = value
+                yield base_frame(
+                    arr,
+                    swapped=[out],
+                    aux_array=visual_lengths,
+                    explanation=f"{self.name}: writing stable rod of length {length} after gravity.",
+                    operation="write",
+                    metadata={"phase": "write", "rod": length},
+                )
+                out += 1
         yield done_frame(arr, self.name)
+
+    def get_invariant(self) -> str:
+        return "After each gravity pass, column bead counts equal the number of elements >= the row index in that column."
 
 
 class SortingNetworkSort(SortAlgorithm):
@@ -150,17 +232,41 @@ class SortingNetworkSort(SortAlgorithm):
     time_complexity = "O(log² n)"
     space_complexity = "O(1)"
     stable = False
-    description = "Odd-even sorting network visualization."
+    description = "Generic insertion-sort comparator network visualization."
 
     def sort(self, arr: List[int], ascending: bool = True) -> Generator[SortFrame, None, None]:
-        yield from odd_even_network(
+        n = len(arr)
+        yield base_frame(
+            arr,
+            explanation=f"{self.name}: laying out insertion-network wires before the first comparator.",
+            operation="read",
+            metadata={"network": "insertion", "level": -1, "step": 0},
+        )
+
+        def comparators() -> Generator[tuple[int, int, bool, dict[str, Any], str], None, None]:
+            level = 0
+            for i in range(1, n):
+                for j in range(i, 0, -1):
+                    yield (
+                        j - 1,
+                        j,
+                        True,
+                        {"network": "insertion", "level": level, "step": i},
+                        f"{self.name}: insertion-network comparator shifts wire {j} left if needed.",
+                    )
+                    level += 1
+
+        yield from compare_exchange_network(
             arr,
             ascending,
             self.name,
-            passes=max(1, len(arr)),
-            metadata_for=lambda level, step, _phase: {"network": True, "level": level, "step": step},
+            wire_count=n,
+            comparators=comparators(),
         )
         yield done_frame(arr, self.name, metadata={"network": True})
+
+    def get_invariant(self) -> str:
+        return "Each comparator in the fixed insertion-sort-derived network fires exactly once in predetermined order."
 
 
 class BitonicSort(SortAlgorithm):
@@ -172,19 +278,48 @@ class BitonicSort(SortAlgorithm):
     description = "Bitonic network simulation for arbitrary-size arrays."
 
     def sort(self, arr: List[int], ascending: bool = True) -> Generator[SortFrame, None, None]:
-        yield from odd_even_network(
+        power = 1
+        while power < max(1, len(arr)):
+            power *= 2
+
+        def comparators() -> Generator[tuple[int, int, bool, dict[str, Any], str], None, None]:
+            step = 0
+            size = 2
+            while size <= power:
+                stride = size // 2
+                while stride:
+                    for i in range(power):
+                        j = i ^ stride
+                        if j <= i:
+                            continue
+                        direction = (i & size) == 0
+                        yield (
+                            i,
+                            j,
+                            direction,
+                            {
+                                "network": "bitonic",
+                                "step": step,
+                                "substep": stride,
+                                "direction": "asc" if direction else "desc",
+                            },
+                            f"{self.name}: bitonic comparator at size {size} and stride {stride}.",
+                        )
+                    step += 1
+                    stride //= 2
+                size *= 2
+
+        yield from compare_exchange_network(
             arr,
             ascending,
             self.name,
-            passes=max(1, len(arr)),
-            metadata_for=lambda step, substep, _phase: {
-                "network": True,
-                "step": step,
-                "substep": substep,
-                "direction": "asc" if ascending else "desc",
-            },
+            wire_count=power,
+            comparators=comparators(),
         )
         yield done_frame(arr, self.name, metadata={"network": True})
+
+    def get_invariant(self) -> str:
+        return "Each stage builds a bitonic sequence of length 2^k; the final stage merges the full bitonic sequence."
 
 
 class SpaghettiSort(SortAlgorithm):
@@ -353,23 +488,59 @@ class ICantBelieveSort(SortAlgorithm):
 class LinearSort(SortAlgorithm):
     name = "Linear Sort"
     category = CATEGORY
-    time_complexity = "O(n)"
+    time_complexity = "O(n²)"
     space_complexity = "O(n)"
     stable = True
-    description = "Counting-style linear integer sort."
+    description = "Output-sensitive repeated minimum scan with a growing sorted prefix."
 
     def sort(self, arr: List[int], ascending: bool = True) -> Generator[SortFrame, None, None]:
-        ordered = sorted_values(arr, ascending)
-        for index, value in enumerate(ordered):
-            arr[index] = value
+        remaining = list(enumerate(arr))
+        output: list[Any] = []
+        for prefix in range(len(arr)):
+            best_pos = 0
+            for scan in range(1, len(remaining)):
+                yield base_frame(
+                    arr,
+                    highlighted=[prefix + scan if prefix + scan < len(arr) else prefix],
+                    sorted_indices=list(range(prefix)),
+                    aux_array=[value for _idx, value in remaining],
+                    explanation=f"{self.name}: scanning remaining values for the next output minimum.",
+                    operation="compare",
+                    metadata={"prefix": prefix, "candidate": best_pos},
+                )
+                candidate = remaining[scan][1]
+                best = remaining[best_pos][1]
+                if (
+                    value_of(candidate) < value_of(best)
+                    if ascending
+                    else value_of(candidate) > value_of(best)
+                ):
+                    best_pos = scan
+                    yield base_frame(
+                        arr,
+                        highlighted=[prefix],
+                        sorted_indices=list(range(prefix)),
+                        aux_array=[value for _idx, value in remaining],
+                        explanation=f"{self.name}: updating the pointer to the next output value.",
+                        operation="read",
+                        metadata={"prefix": prefix, "candidate": best_pos},
+                    )
+            _original_index, value = remaining.pop(best_pos)
+            output.append(value)
+            arr[prefix] = value
             yield base_frame(
                 arr,
-                swapped=[index],
-                aux_array=ordered,
-                explanation=f"{self.name}: writing the next linear bucket value.",
+                swapped=[prefix],
+                sorted_indices=list(range(prefix + 1)),
+                aux_array=output[:] + [value for _idx, value in remaining],
+                explanation=f"{self.name}: appending the selected value to the sorted prefix.",
                 operation="write",
+                metadata={"prefix": prefix + 1},
             )
         yield done_frame(arr, self.name)
+
+    def get_invariant(self) -> str:
+        return "A running minimum pointer advances only when a new minimum is found; each minimum is output in order."
 
 
 class QuantumSort(SortAlgorithm):
@@ -400,6 +571,9 @@ class QuantumSort(SortAlgorithm):
                 metadata={"quantum": True},
             )
         yield done_frame(arr, self.name, metadata={"quantum": True})
+
+    def get_invariant(self) -> str:
+        return "The observed branch preserves the input multiset while each collapse write places one stable sorted value."
 
 
 class StalinSort(SortAlgorithm):
@@ -495,10 +669,10 @@ JOKE_ALGORITHMS = {
     "intelligent_design",
 }
 
-CATEGORY_ALGORITHMS = registry_from(_ITEMS)
-CATEGORY_KEYS = keys_from(_ITEMS)
+CATEGORY_ALGORITHMS = registry_from(_ITEMS)  # type: ignore[arg-type]
+CATEGORY_KEYS = keys_from(_ITEMS)  # type: ignore[arg-type]
 
-__all__ = [cls.__name__ for _key, cls in _ITEMS] + [
+__all__ = [cls.__name__ for _key, cls in _ITEMS] + [  # type: ignore[attr-defined]
     "CATEGORY_ALGORITHMS",
     "CATEGORY_KEYS",
     "JOKE_ALGORITHMS",

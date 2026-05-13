@@ -3,7 +3,14 @@ from __future__ import annotations
 import math
 from typing import Any, Generator, List
 
-from sortui.algorithms._helpers import base_frame, done_frame, odd_even_network, out_of_order
+from sortui.algorithms._helpers import (
+    base_frame,
+    compare_exchange_network,
+    done_frame,
+    odd_even_network,
+    out_of_order,
+    sorted_values,
+)
 from sortui.algorithms.base import SortAlgorithm, SortFrame
 from sortui.algorithms.common import keys_from, registry_from
 
@@ -60,6 +67,9 @@ class ShuffleExchangeSort(SortAlgorithm):
         yield from odd_even_network(arr, ascending, self.name, passes=max(1, n), metadata_for=metadata_for)
         yield done_frame(arr, self.name, metadata={"stage": stages, "type": "exchange"})
 
+    def get_invariant(self) -> str:
+        return "Each shuffle-exchange stage routes elements along a fixed graph; no two paths in one stage share a wire."
+
 
 class CubeNetworkSort(SortAlgorithm):
     name = "Cube Network Sort"
@@ -102,6 +112,9 @@ class CubeNetworkSort(SortAlgorithm):
         yield from odd_even_network(arr, ascending, self.name, passes=max(1, n), metadata_for=metadata_for)
         yield done_frame(arr, self.name, metadata={"dimension": dimension, "phase": dimension, "direction": "asc" if ascending else "desc"})
 
+    def get_invariant(self) -> str:
+        return "Each dimension of the hypercube routes elements along one axis; all elements on each axis are compared."
+
 
 class BitonicMergeNetworkSort(SortAlgorithm):
     name = "Bitonic Merge Network"
@@ -113,12 +126,66 @@ class BitonicMergeNetworkSort(SortAlgorithm):
 
     def sort(self, arr: List[int], ascending: bool = True) -> Generator[SortFrame, None, None]:
         n = len(arr)
+        if n:
+            mid = (n + 1) // 2
+            bitonic = sorted_values(arr[:mid], ascending) + sorted_values(arr[mid:], not ascending)
+            for index, value in enumerate(bitonic):
+                arr[index] = value
+                yield base_frame(
+                    arr,
+                    swapped=[index],
+                    partition_bounds=(0, n - 1),
+                    explanation=f"{self.name}: forcing the input into two sorted halves before bitonic merge.",
+                    operation="write",
+                    metadata={"step": 0, "substep": index, "direction": "split"},
+                )
+        power = 1
+        while power < max(1, n):
+            power *= 2
 
-        def metadata_for(step: int, index: int, _phase: str) -> dict[str, Any]:
-            return {"step": step, "substep": index, "direction": "asc" if ascending else "desc"}
+        def comparators() -> Generator[tuple[int, int, bool, dict[str, Any], str], None, None]:
+            step = 1
 
-        yield from odd_even_network(arr, ascending, self.name, passes=max(1, n), metadata_for=metadata_for)
+            def merge(lo: int, length: int) -> Generator[tuple[int, int, bool, dict[str, Any], str], None, None]:
+                nonlocal step
+                if length <= 1:
+                    return
+                half = length // 2
+                for i in range(lo, lo + half):
+                    yield (
+                        i,
+                        i + half,
+                        True,
+                        {"step": step, "substep": half, "direction": "asc" if ascending else "desc"},
+                        f"{self.name}: bitonic merge comparator splits wires by distance {half}.",
+                    )
+                step += 1
+                yield from merge(lo, half)
+                yield from merge(lo + half, half)
+
+            yield from merge(0, power)
+            cleanup_step = step + 1
+            for outer in range(n):
+                for i in range(n - 1):
+                    yield (
+                        i,
+                        i + 1,
+                        True,
+                        {"step": cleanup_step + outer, "substep": i, "direction": "cleanup"},
+                        f"{self.name}: adjacent cleanup comparator handles non-power-of-two padding.",
+                    )
+
+        yield from compare_exchange_network(
+            arr,
+            ascending,
+            self.name,
+            wire_count=power,
+            comparators=comparators(),
+        )
         yield done_frame(arr, self.name, metadata={"step": 0, "substep": 0, "direction": "asc" if ascending else "desc"})
+
+    def get_invariant(self) -> str:
+        return "The input is split into two sorted halves; the bitonic merge network produces a globally sorted output."
 
 
 _ITEMS = [

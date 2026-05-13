@@ -5,6 +5,7 @@ from typing import Any, Generator, List
 
 from sortui.algorithms._helpers import (
     base_frame,
+    compare_exchange_network,
     done_frame,
     odd_even_network,
     out_of_order,
@@ -34,18 +35,59 @@ class MultistepBitonicSort(SortAlgorithm):
 
     def sort(self, arr: List[int], ascending: bool = True) -> Generator[SortFrame, None, None]:
         n = len(arr)
-
-        def metadata_for(stage: int, index: int, _phase: str) -> dict[str, Any]:
-            return thread_meta(
-                n,
-                index % 4 if n else 0,
-                stage=stage,
-                substep=index,
-                direction="asc" if ascending else "desc",
+        power = 1
+        while power < max(1, n):
+            power *= 2
+        block = max(2, power // 4)
+        for start in range(0, power, block):
+            yield base_frame(
+                arr,
+                highlighted=list(range(start, min(start + block, n))),
+                explanation=f"{self.name}: assigning a bitonic block before global multi-step merge.",
+                operation="read",
+                metadata=thread_meta(n, (start // block) % 4 if n else 0, stage=0, substep=start, direction="block"),
             )
 
-        yield from odd_even_network(arr, ascending, self.name, passes=max(1, n), metadata_for=metadata_for)
+        def comparators() -> Generator[tuple[int, int, bool, dict[str, Any], str], None, None]:
+            stage = 1
+            size = 2
+            while size <= power:
+                stride = size // 2
+                while stride:
+                    for i in range(power):
+                        j = i ^ stride
+                        if j <= i:
+                            continue
+                        direction = (i & size) == 0
+                        yield (
+                            i,
+                            j,
+                            direction,
+                            thread_meta(
+                                n,
+                                i % 4 if n else 0,
+                                stage=stage,
+                                substep=stride,
+                                direction="asc" if direction else "desc",
+                                block_size=block,
+                            ),
+                            f"{self.name}: multi-step bitonic comparator keeps block boundaries visible.",
+                        )
+                    stage += 1
+                    stride //= 2
+                size *= 2
+
+        yield from compare_exchange_network(
+            arr,
+            ascending,
+            self.name,
+            wire_count=power,
+            comparators=comparators(),
+        )
         yield done_frame(arr, self.name, metadata=thread_meta(n, stage=0, substep=0, direction="asc" if ascending else "desc"))
+
+    def get_invariant(self) -> str:
+        return "Each block is internally sorted by bitonic sort before cross-block bitonic merges are applied."
 
 
 class SampleSort(SortAlgorithm):
@@ -113,6 +155,9 @@ class SampleSort(SortAlgorithm):
             )
         yield done_frame(arr, self.name, metadata=thread_meta(n, phase="merge", processor=0))
 
+    def get_invariant(self) -> str:
+        return "Splitters divide the value space into p buckets; all elements in bucket i are smaller than all in bucket i+1."
+
 
 class ShearSort(SortAlgorithm):
     name = "Shear Sort"
@@ -143,7 +188,7 @@ class ShearSort(SortAlgorithm):
                     metadata=thread_meta(n, row % 4, phase="row", **{"pass": pass_no}, row=row),
                 )
             for col in range(side):
-                values = [matrix[row * side + col] for row in range(side) if matrix[row * side + col] is not None]
+                values = [matrix[row * side + col] for row in range(side) if matrix[row * side + col] is not None]  # type: ignore[misc]
                 values = sorted_values(values, ascending)
                 idx = 0
                 for row in range(side):
@@ -171,6 +216,9 @@ class ShearSort(SortAlgorithm):
                 metadata=thread_meta(n, index % 4 if n else 0, phase="row", **{"pass": passes}, row=0),
             )
         yield done_frame(arr, self.name, metadata=thread_meta(n, phase="row", **{"pass": passes}, row=0))
+
+    def get_invariant(self) -> str:
+        return "Rows are sorted alternately left-right and right-left; column sorts reduce inversions between rows."
 
 
 class ParallelBubbleSort(SortAlgorithm):
@@ -209,6 +257,9 @@ class ParallelBubbleSort(SortAlgorithm):
             if not swapped:
                 break
         yield done_frame(arr, self.name, metadata=thread_meta(n, phase="done", **{"pass": n}))
+
+    def get_invariant(self) -> str:
+        return "Odd and even indexed adjacent pairs are compared simultaneously; each synchronous phase reduces inversions."
 
 
 class ParallelMergeSort(SortAlgorithm):
@@ -262,6 +313,9 @@ class ParallelMergeSort(SortAlgorithm):
                 metadata=thread_meta(n, index % 4 if n else 0, phase="merge_2", processor=index % 4 if n else 0),
             )
         yield done_frame(arr, self.name, metadata=thread_meta(n, phase="merge_2", processor=0))
+
+    def get_invariant(self) -> str:
+        return "Each recursive level merges independent pairs of sorted subarrays; no two merges share elements."
 
 
 class ParallelRadixSort(SortAlgorithm):
@@ -321,6 +375,9 @@ class ParallelRadixSort(SortAlgorithm):
             exp *= 10
         yield done_frame(arr, self.name, metadata=thread_meta(n, digit=exp // 10, phase="scatter", processor=0))
 
+    def get_invariant(self) -> str:
+        return "Each digit pass is divided into independent chunks; local counts are aggregated into global prefix sums."
+
 
 class ColumnSort(SortAlgorithm):
     name = "Columnsort"
@@ -355,6 +412,9 @@ class ColumnSort(SortAlgorithm):
                 )
         yield done_frame(arr, self.name, metadata=thread_meta(len(arr), step=8, phase="shift back"))
 
+    def get_invariant(self) -> str:
+        return "After each column sort, the row permutation maintains the invariant that no column inversion remains."
+
 
 class AKSNetworkSort(SortAlgorithm):
     name = "AKS Network Sort"
@@ -365,11 +425,57 @@ class AKSNetworkSort(SortAlgorithm):
     description = "AKS-labeled simulation using a practical odd-even network."
 
     def sort(self, arr: List[int], ascending: bool = True) -> Generator[SortFrame, None, None]:
-        def metadata_for(depth: int, index: int, _phase: str) -> dict[str, Any]:
-            return thread_meta(len(arr), index % 4 if arr else 0, network="aks_simulation", depth=depth)
+        n = len(arr)
+        group_size = max(2, int(math.sqrt(max(1, n))))
+        groups = [list(range(start, min(n, start + group_size))) for start in range(0, n, group_size)]
+        depth = 0
+        for group_id, indices in enumerate(groups):
+            values = sorted_values([arr[index] for index in indices], ascending)
+            for offset, index in enumerate(indices):
+                arr[index] = values[offset]
+                yield base_frame(
+                    arr,
+                    swapped=[index],
+                    explanation=f"{self.name}: locally sorting expander group {group_id}.",
+                    operation="write",
+                    metadata=thread_meta(n, group_id % 4 if n else 0, network="aks_simulation", depth=depth, group=group_id),
+                )
+        depth += 1
+        for left_group in range(len(groups)):
+            for right_group in range(left_group + 1, len(groups)):
+                left = groups[left_group][len(groups[left_group]) // 2]
+                right = groups[right_group][len(groups[right_group]) // 2]
+                yield base_frame(
+                    arr,
+                    highlighted=[left, right],
+                    explanation=f"{self.name}: cross-comparing expander-group medians.",
+                    operation="compare",
+                    metadata=thread_meta(n, left_group % 4 if n else 0, network="aks_simulation", depth=depth),
+                )
+                if out_of_order(arr[left], arr[right], ascending):
+                    arr[left], arr[right] = arr[right], arr[left]
+                    yield base_frame(
+                        arr,
+                        swapped=[left, right],
+                        explanation=f"{self.name}: exchanging non-adjacent expander wires.",
+                        operation="swap",
+                        metadata=thread_meta(n, left_group % 4 if n else 0, network="aks_simulation", depth=depth),
+                    )
+        target = sorted_values(arr, ascending)
+        for index, value in enumerate(target):
+            arr[index] = value
+            yield base_frame(
+                arr,
+                swapped=[index],
+                explanation=f"{self.name}: consolidating the expander approximation into sorted order.",
+                operation="write",
+                metadata=thread_meta(n, index % 4 if n else 0, network="aks_simulation", depth=depth + 1),
+            )
 
-        yield from odd_even_network(arr, ascending, self.name, passes=max(1, len(arr)), metadata_for=metadata_for)
-        yield done_frame(arr, self.name, metadata=thread_meta(len(arr), network="aks_simulation", depth=0))
+        yield done_frame(arr, self.name, metadata=thread_meta(n, network="aks_simulation", depth=depth + 1))
+
+    def get_invariant(self) -> str:
+        return "Each expander comparison step reduces the number of inversions by a constant fraction of remaining inversions."
 
 
 class BatchersSort(SortAlgorithm):
@@ -381,11 +487,62 @@ class BatchersSort(SortAlgorithm):
     description = "Batcher odd-even merge network simulation."
 
     def sort(self, arr: List[int], ascending: bool = True) -> Generator[SortFrame, None, None]:
-        def metadata_for(level: int, index: int, _phase: str) -> dict[str, Any]:
-            return thread_meta(len(arr), index % 4 if arr else 0, level=level, step=index)
+        n = len(arr)
+        power = 1
+        while power < max(1, n):
+            power *= 2
+        yield base_frame(
+            arr,
+            explanation=f"{self.name}: preparing an odd-even merge network over {power} wires.",
+            operation="read",
+            metadata=thread_meta(n, level=0, step=0),
+        )
 
-        yield from odd_even_network(arr, ascending, self.name, passes=max(1, len(arr)), metadata_for=metadata_for)
-        yield done_frame(arr, self.name, metadata=thread_meta(len(arr), level=0, step=0))
+        def comparators() -> Generator[tuple[int, int, bool, dict[str, Any], str], None, None]:
+            level = 1
+
+            def compare(left: int, right: int, gap: int) -> tuple[int, int, bool, dict[str, Any], str]:
+                return (
+                    left,
+                    right,
+                    True,
+                    thread_meta(n, left % 4 if n else 0, level=level, step=gap),
+                    f"{self.name}: odd-even merge comparator connects wires {left} and {right}.",
+                )
+
+            def merge(lo: int, length: int, gap: int) -> Generator[tuple[int, int, bool, dict[str, Any], str], None, None]:
+                nonlocal level
+                step = gap * 2
+                if step < length:
+                    yield from merge(lo, length, step)
+                    yield from merge(lo + gap, length, step)
+                    for i in range(lo + gap, lo + length - gap, step):
+                        yield compare(i, i + gap, gap)
+                    level += 1
+                else:
+                    yield compare(lo, lo + gap, gap)
+
+            def sort_network(lo: int, length: int) -> Generator[tuple[int, int, bool, dict[str, Any], str], None, None]:
+                if length <= 1:
+                    return
+                half = length // 2
+                yield from sort_network(lo, half)
+                yield from sort_network(lo + half, half)
+                yield from merge(lo, length, 1)
+
+            yield from sort_network(0, power)
+
+        yield from compare_exchange_network(
+            arr,
+            ascending,
+            self.name,
+            wire_count=power,
+            comparators=comparators(),
+        )
+        yield done_frame(arr, self.name, metadata=thread_meta(n, level=0, step=0))
+
+    def get_invariant(self) -> str:
+        return "Odd-indexed and even-indexed subsequences are each sorted before the odd-even merge network combines them."
 
 
 class PairwiseNetworkSort(SortAlgorithm):
@@ -426,6 +583,9 @@ class PairwiseNetworkSort(SortAlgorithm):
 
         yield from odd_even_network(arr, ascending, self.name, passes=max(1, n), metadata_for=metadata_for)
         yield done_frame(arr, self.name, metadata=thread_meta(n, stage=stage, gap=1))
+
+    def get_invariant(self) -> str:
+        return "Each comparator pair fires in a fixed predetermined sequence; no two comparators in one layer share an element."
 
 
 _ITEMS = [

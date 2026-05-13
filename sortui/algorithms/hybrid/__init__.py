@@ -44,6 +44,7 @@ class TimSort(SortAlgorithm):
     def sort(self, arr: List[int], ascending: bool = True) -> Generator[SortFrame, None, None]:
         n = len(arr)
         min_run = self._calc_min_run(n)
+        effective_min_run = min(min_run, max(8, n // 4)) if n else 0
         runs: list[tuple[int, int]] = []
         i = 0
         while i < n:
@@ -57,7 +58,12 @@ class TimSort(SortAlgorithm):
                         highlighted=[i - 1, i],
                         explanation=f"{self.name}: detecting a natural run.",
                         operation="compare",
-                        metadata={"min_run": min_run, "run_count": len(runs) + 1, "gallop": False},
+                        metadata={
+                            "min_run": min_run,
+                            "effective_min_run": effective_min_run,
+                            "run_count": len(runs) + 1,
+                            "gallop": False,
+                        },
                     )
                     continues = (
                         out_of_order(arr[i - 1], arr[i], ascending)
@@ -74,9 +80,14 @@ class TimSort(SortAlgorithm):
                         swapped=list(range(start, i)),
                         explanation=f"{self.name}: reversing a descending natural run.",
                         operation="write",
-                        metadata={"min_run": min_run, "run_count": len(runs) + 1, "gallop": False},
+                        metadata={
+                            "min_run": min_run,
+                            "effective_min_run": effective_min_run,
+                            "run_count": len(runs) + 1,
+                            "gallop": False,
+                        },
                     )
-            run_end = min(n, max(i, start + min_run))
+            run_end = min(n, max(i, start + effective_min_run))
             if run_end > i:
                 yield from insertion_sort_range(
                     arr,
@@ -84,7 +95,12 @@ class TimSort(SortAlgorithm):
                     run_end,
                     ascending,
                     self.name,
-                    metadata={"min_run": min_run, "run_count": len(runs) + 1, "gallop": False},
+                    metadata={
+                        "min_run": min_run,
+                        "effective_min_run": effective_min_run,
+                        "run_count": len(runs) + 1,
+                        "gallop": False,
+                    },
                     explanation_prefix="extending a short natural run; ",
                 )
                 i = run_end
@@ -112,7 +128,16 @@ class TimSort(SortAlgorithm):
             right = runs[-1][1]
             yield from self._merge(arr, left, mid, right, ascending, min_run, len(runs))
             runs[-2:] = [(left, right)]
-        yield done_frame(arr, self.name, metadata={"min_run": min_run, "run_count": len(runs), "gallop": False})
+        yield done_frame(
+            arr,
+            self.name,
+            metadata={
+                "min_run": min_run,
+                "effective_min_run": effective_min_run,
+                "run_count": len(runs),
+                "gallop": False,
+            },
+        )
 
     def _merge(
         self,
@@ -187,6 +212,9 @@ class TimSort(SortAlgorithm):
             )
             j += 1
             k += 1
+
+    def get_invariant(self) -> str:
+        return "Natural runs are identified and merged in length order; the merge stack maintains the invariant |Z| > |Y| + |X|."
 
 
 class IntroSort(SortAlgorithm):
@@ -294,6 +322,9 @@ class IntroSort(SortAlgorithm):
         yield from self._intro(arr, lo, i, ascending, depth_left - 1, depth + 1)
         yield from self._intro(arr, i + 1, hi, ascending, depth_left - 1, depth + 1)
 
+    def get_invariant(self) -> str:
+        return "Recursion depth is bounded by 2*floor(log2(n)); when exceeded the algorithm switches to heapsort."
+
 
 class DualPivotQuickSort(SortAlgorithm):
     name = "Dual-Pivot Quicksort"
@@ -370,6 +401,9 @@ class DualPivotQuickSort(SortAlgorithm):
                 yield from insertion_sort_range(arr, start, end + 1, ascending, self.name)
             else:
                 yield from self._sort(arr, start, end, ascending, depth + 1)
+
+    def get_invariant(self) -> str:
+        return "Elements are partitioned into three regions: less than pivot1, between pivots, greater than pivot2."
 
 
 class FluxSort(SortAlgorithm):
@@ -457,9 +491,12 @@ class FluxSort(SortAlgorithm):
                 recursion_depth=depth,
                 explanation=f"{self.name}: writing a stable partition value back.",
                 operation="write",
-            )
+        )
         yield from self._stable_quick(arr, lo, lo + len(less), ascending, depth + 1)
         yield from self._stable_quick(arr, lo + len(less) + len(equal), hi, ascending, depth + 1)
+
+    def get_invariant(self) -> str:
+        return "A stable partition separates elements smaller and larger than pivot; recursion depth is bounded."
 
 
 def strictly_before_value(left: Any, right: Any, ascending: bool) -> bool:
@@ -553,6 +590,9 @@ class Crumsort(SortAlgorithm):
         )
         yield from self._quick(arr, lo, i - 1, ascending, depth + 1)
         yield from self._quick(arr, i + 1, hi, ascending, depth + 1)
+
+    def get_invariant(self) -> str:
+        return "An unstable partition identifies a pivot region; out-of-place elements are rotated into position."
 
 
 _ITEMS = [

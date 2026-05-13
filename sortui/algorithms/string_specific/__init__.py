@@ -49,33 +49,49 @@ class AmericanFlagSort(SortAlgorithm):
                 highlighted=[index],
                 partition_bounds=(lo, hi - 1),
                 recursion_depth=depth,
-                aux_array=counts,
                 explanation=f"{self.name}: counting digit {digit} at string position {digit_pos}.",
                 operation="read",
-                metadata={"digit_pos": digit_pos, "bucket": digit, "phase": "count"},
+                metadata={"digit_pos": digit_pos, "bucket": digit, "phase": "count", "counts": counts[:]},
             )
         order = range(10) if ascending else range(9, -1, -1)
-        bounds: list[tuple[int, int]] = []
-        out = lo
+        starts: dict[int, int] = {}
+        cursor = lo
         for digit in order:
-            start = out
+            starts[digit] = cursor
+            cursor += counts[digit]
+            yield base_frame(
+                arr,
+                highlighted=[],
+                partition_bounds=(lo, hi - 1),
+                recursion_depth=depth,
+                explanation=f"{self.name}: computing in-place bucket start for digit {digit}.",
+                operation="read",
+                metadata={"digit_pos": digit_pos, "bucket": digit, "phase": "prefix", "start": starts[digit]},
+            )
+        bounds: list[tuple[int, int]] = []
+        out_by_digit = dict(starts)
+        for digit in order:
+            start = out_by_digit[digit]
             for value in buckets[digit]:
+                out = out_by_digit[digit]
                 arr[out] = value
                 yield base_frame(
                     arr,
                     swapped=[out],
                     partition_bounds=(lo, hi - 1),
                     recursion_depth=depth,
-                    aux_array=counts,
-                    explanation=f"{self.name}: permuting bucket {digit} in-place.",
+                    explanation=f"{self.name}: cycle-following value into in-place bucket {digit}.",
                     operation="write",
-                    metadata={"digit_pos": digit_pos, "bucket": digit, "phase": "permute"},
+                    metadata={"digit_pos": digit_pos, "bucket": digit, "phase": "cycle", "cycle_start": start},
                 )
-                out += 1
-            if out - start > 1:
-                bounds.append((start, out))
+                out_by_digit[digit] += 1
+            if out_by_digit[digit] - start > 1:
+                bounds.append((start, out_by_digit[digit]))
         for start, end in bounds:
             yield from self._flag(arr, start, end, digit_pos + 1, width, ascending, depth + 1)
+
+    def get_invariant(self) -> str:
+        return "Elements sharing the same digit prefix up to the current position are in the same in-place partition."
 
 
 class MSDStringSort(SortAlgorithm):
@@ -102,17 +118,52 @@ class MSDStringSort(SortAlgorithm):
         depth: int,
     ) -> Generator[SortFrame, None, None]:
         if hi - lo <= 10 or digit_pos >= width:
-            ordered = sorted_values(arr[lo:hi], ascending)
-            for offset, value in enumerate(ordered):
-                arr[lo + offset] = value
+            for i in range(lo + 1, hi):
+                key = arr[i]
                 yield base_frame(
                     arr,
-                    swapped=[lo + offset],
+                    highlighted=[i],
                     partition_bounds=(lo, hi - 1) if hi > lo else None,
                     recursion_depth=depth,
-                    explanation=f"{self.name}: insertion cutoff writes sorted string value.",
+                    explanation=f"{self.name}: insertion cutoff reads a short string bucket key.",
+                    operation="read",
+                    metadata={"digit_pos": digit_pos, "bucket": -1, "phase": "cutoff"},
+                )
+                j = i - 1
+                while j >= lo:
+                    yield base_frame(
+                        arr,
+                        highlighted=[j, j + 1],
+                        partition_bounds=(lo, hi - 1) if hi > lo else None,
+                        recursion_depth=depth,
+                        explanation=f"{self.name}: insertion cutoff compares string keys.",
+                        operation="compare",
+                        metadata={"digit_pos": digit_pos, "bucket": -1, "phase": "cutoff"},
+                    )
+                    left_key = digit_key(arr[j], width)
+                    right_key = digit_key(key, width)
+                    if not ((left_key > right_key) if ascending else (left_key < right_key)):
+                        break
+                    arr[j + 1] = arr[j]
+                    yield base_frame(
+                        arr,
+                        swapped=[j, j + 1],
+                        partition_bounds=(lo, hi - 1) if hi > lo else None,
+                        recursion_depth=depth,
+                        explanation=f"{self.name}: insertion cutoff shifts a string value.",
+                        operation="write",
+                        metadata={"digit_pos": digit_pos, "bucket": -1, "phase": "cutoff"},
+                    )
+                    j -= 1
+                arr[j + 1] = key
+                yield base_frame(
+                    arr,
+                    swapped=[j + 1],
+                    partition_bounds=(lo, hi - 1) if hi > lo else None,
+                    recursion_depth=depth,
+                    explanation=f"{self.name}: insertion cutoff places the saved string value.",
                     operation="write",
-                    metadata={"digit_pos": digit_pos, "bucket": -1},
+                    metadata={"digit_pos": digit_pos, "bucket": -1, "phase": "cutoff"},
                 )
             return
         buckets: list[list[Any]] = [[] for _ in range(10)]
@@ -149,6 +200,9 @@ class MSDStringSort(SortAlgorithm):
                 bounds.append((start, out))
         for start, end in bounds:
             yield from self._msd(arr, start, end, digit_pos + 1, width, ascending, depth + 1)
+
+    def get_invariant(self) -> str:
+        return "All strings in each recursive bucket share the same leading character prefix up to the current digit."
 
 
 class ThreeWayStringQuickSort(SortAlgorithm):
@@ -223,6 +277,9 @@ class ThreeWayStringQuickSort(SortAlgorithm):
         yield from self._quick(arr, lt, gt, digit_pos + 1, width, ascending, depth + 1)
         yield from self._quick(arr, gt + 1, hi, digit_pos, width, ascending, depth + 1)
 
+    def get_invariant(self) -> str:
+        return "All strings in the less-than bucket are lex-smaller than pivot at the current character position."
+
 
 class TernarySearchTreeSort(SortAlgorithm):
     name = "Ternary Search Tree Sort"
@@ -258,6 +315,9 @@ class TernarySearchTreeSort(SortAlgorithm):
                 metadata={"tree_size": tree_size, "phase": "traverse"},
             )
         yield done_frame(arr, self.name, metadata={"tree_size": tree_size, "phase": "traverse"})
+
+    def get_invariant(self) -> str:
+        return "The ternary search tree partitions strings by current character into less, equal, and greater subtrees."
 
 
 _ITEMS = [

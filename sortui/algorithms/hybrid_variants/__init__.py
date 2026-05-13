@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import heapq
 from typing import Any, Generator, List
 
 from sortui.algorithms._helpers import (
@@ -50,6 +51,9 @@ class WeakHeapSort(SortAlgorithm):
         yield from heap_sort_range(arr, 0, len(arr), ascending, self.name, metadata={"flags": flags[:]})
         yield done_frame(arr, self.name, metadata={"flags": flags[:]})
 
+    def get_invariant(self) -> str:
+        return "Each merge step maintains the weak-heap property: every right-spine child is <= its grandparent."
+
 
 class BottomUpHeapSort(SortAlgorithm):
     name = "Bottom-Up Heapsort"
@@ -60,21 +64,91 @@ class BottomUpHeapSort(SortAlgorithm):
     description = "Heapsort with bottom-up sift-down annotations."
 
     def sort(self, arr: List[int], ascending: bool = True) -> Generator[SortFrame, None, None]:
-        yield base_frame(
-            arr,
-            explanation=f"{self.name}: descending first to a leaf before sifting up displaced values.",
-            operation="read",
-            metadata={"phase": "sift_down_to_leaf"},
-        )
-        yield from heap_sort_range(
-            arr,
-            0,
-            len(arr),
-            ascending,
-            self.name,
-            metadata=lambda op, _idx: {"phase": "sift_up" if op == "swap" else "sift_down_to_leaf"},
-        )
+        n = len(arr)
+
+        def better(left: Any, right: Any) -> bool:
+            return value_of(left) > value_of(right) if ascending else value_of(left) < value_of(right)
+
+        def sift_bottom_up(root: int, end: int) -> Generator[SortFrame, None, None]:
+            if root > end:
+                return
+            displaced = arr[root]
+            hole = root
+            yield base_frame(
+                arr,
+                highlighted=[root],
+                explanation=f"{self.name}: lifting the root value out and opening a heap hole.",
+                operation="read",
+                metadata={"phase": "sift_down_to_leaf"},
+            )
+            while 2 * hole + 1 <= end:
+                child = 2 * hole + 1
+                right = child + 1
+                if right <= end:
+                    yield base_frame(
+                        arr,
+                        highlighted=[child, right],
+                        explanation=f"{self.name}: choosing the better child while descending to a leaf.",
+                        operation="compare",
+                        metadata={"phase": "sift_down_to_leaf"},
+                    )
+                    if better(arr[right], arr[child]):
+                        child = right
+                arr[hole] = arr[child]
+                yield base_frame(
+                    arr,
+                    swapped=[hole, child],
+                    explanation=f"{self.name}: moving a child up while the heap hole travels downward.",
+                    operation="write",
+                    metadata={"phase": "sift_down_to_leaf"},
+                )
+                hole = child
+            while hole > root:
+                parent = (hole - 1) // 2
+                yield base_frame(
+                    arr,
+                    highlighted=[parent, hole],
+                    explanation=f"{self.name}: testing whether the displaced value should sift back upward.",
+                    operation="compare",
+                    metadata={"phase": "sift_up"},
+                )
+                if better(displaced, arr[parent]):
+                    arr[hole] = arr[parent]
+                    yield base_frame(
+                        arr,
+                        swapped=[parent, hole],
+                        explanation=f"{self.name}: moving a parent down as the displaced value sifts up.",
+                        operation="write",
+                        metadata={"phase": "sift_up"},
+                    )
+                    hole = parent
+                else:
+                    break
+            arr[hole] = displaced
+            yield base_frame(
+                arr,
+                swapped=[hole],
+                explanation=f"{self.name}: placing the displaced value into the final heap hole.",
+                operation="write",
+                metadata={"phase": "sift_up"},
+            )
+
+        for start in range(n // 2 - 1, -1, -1):
+            yield from sift_bottom_up(start, n - 1)
+        for end in range(n - 1, 0, -1):
+            arr[0], arr[end] = arr[end], arr[0]
+            yield base_frame(
+                arr,
+                swapped=[0, end],
+                explanation=f"{self.name}: extracting the heap root before bottom-up repair.",
+                operation="swap",
+                metadata={"phase": "extract"},
+            )
+            yield from sift_bottom_up(0, end - 1)
         yield done_frame(arr, self.name, metadata={"phase": "sift_up"})
+
+    def get_invariant(self) -> str:
+        return "A hole descends to a leaf, then the displaced value sifts back up to its correct heap position."
 
 
 class TernaryHeapSort(SortAlgorithm):
@@ -130,6 +204,9 @@ class TernaryHeapSort(SortAlgorithm):
             yield from sift(0, end - 1)
         yield done_frame(arr, self.name)
 
+    def get_invariant(self) -> str:
+        return "Each node in the ternary heap has up to three children; the largest child is promoted during sift-down."
+
 
 class TwinHeapSort(SortAlgorithm):
     name = "Twin Heapsort"
@@ -140,31 +217,71 @@ class TwinHeapSort(SortAlgorithm):
     description = "Simulates interleaved min and max heaps extracting from both ends."
 
     def sort(self, arr: List[int], ascending: bool = True) -> Generator[SortFrame, None, None]:
-        target = sorted_values(arr, ascending)
+        source = arr[:]
+        min_heap: list[tuple[int, int, Any]] = []
+        max_heap: list[tuple[int, int, Any]] = []
+        for index, value in enumerate(source):
+            heapq.heappush(min_heap, (value_of(value), index, value))
+            heapq.heappush(max_heap, (-value_of(value), index, value))
+            yield base_frame(
+                arr,
+                highlighted=[index],
+                aux_array=[item[2] for item in min_heap],
+                explanation=f"{self.name}: inserting value {value} into both twin heaps.",
+                operation="read",
+                metadata={"heap": "both", "extracted_from": "build"},
+            )
+
+        removed: set[int] = set()
         left, right = 0, len(arr) - 1
         while left <= right:
-            arr[left] = target[left]
+            while min_heap and min_heap[0][1] in removed:
+                heapq.heappop(min_heap)
+            while max_heap and max_heap[0][1] in removed:
+                heapq.heappop(max_heap)
+            if ascending:
+                _priority, original_index, value = heapq.heappop(min_heap)
+                heap_name = "min"
+            else:
+                _priority, original_index, value = heapq.heappop(max_heap)
+                heap_name = "max"
+            removed.add(original_index)
+            arr[left] = value
             yield base_frame(
                 arr,
                 swapped=[left],
-                aux_array=target,
-                explanation=f"{self.name}: extracting from the min heap into the left side.",
+                aux_array=[item[2] for item in min_heap if item[1] not in removed],
+                explanation=f"{self.name}: extracting from the {heap_name} heap into the left side.",
                 operation="write",
-                metadata={"heap": "min" if ascending else "max", "extracted_from": "left"},
+                metadata={"heap": heap_name, "extracted_from": "left"},
             )
             if left != right:
-                arr[right] = target[right]
+                while min_heap and min_heap[0][1] in removed:
+                    heapq.heappop(min_heap)
+                while max_heap and max_heap[0][1] in removed:
+                    heapq.heappop(max_heap)
+                if ascending:
+                    _priority, original_index, value = heapq.heappop(max_heap)
+                    heap_name = "max"
+                else:
+                    _priority, original_index, value = heapq.heappop(min_heap)
+                    heap_name = "min"
+                removed.add(original_index)
+                arr[right] = value
                 yield base_frame(
                     arr,
                     swapped=[right],
-                    aux_array=target,
-                    explanation=f"{self.name}: extracting from the max heap into the right side.",
+                    aux_array=[item[2] for item in max_heap if item[1] not in removed],
+                    explanation=f"{self.name}: extracting from the {heap_name} heap into the right side.",
                     operation="write",
-                    metadata={"heap": "max" if ascending else "min", "extracted_from": "right"},
+                    metadata={"heap": heap_name, "extracted_from": "right"},
                 )
             left += 1
             right -= 1
         yield done_frame(arr, self.name, metadata={"heap": "max", "extracted_from": "right"})
+
+    def get_invariant(self) -> str:
+        return "A min-heap fills from the left and a max-heap fills from the right; extractions alternate between both ends."
 
 
 class QuickMergeSort(SortAlgorithm):
@@ -176,13 +293,16 @@ class QuickMergeSort(SortAlgorithm):
     description = "Stable quicksort that switches to merge sort on unbalanced partitions."
 
     def sort(self, arr: List[int], ascending: bool = True) -> Generator[SortFrame, None, None]:
-        yield from self._sort(arr, 0, len(arr), ascending, 0)
+        yield from self._sort(arr, 0, len(arr), ascending, 0, "root")
         yield done_frame(arr, self.name)
 
     def _sort(
-        self, arr: list[Any], lo: int, hi: int, ascending: bool, depth: int
+        self, arr: list[Any], lo: int, hi: int, ascending: bool, depth: int, branch: str
     ) -> Generator[SortFrame, None, None]:
         if hi - lo <= 1:
+            return
+        if hi - lo <= 10:
+            yield from self._small_merge(arr, lo, hi, ascending, depth, branch)
             return
         pivot = arr[(lo + hi - 1) // 2]
         less: list[Any] = []
@@ -197,7 +317,7 @@ class QuickMergeSort(SortAlgorithm):
                 recursion_depth=depth,
                 explanation=f"{self.name}: stable quick partition before deciding merge fallback.",
                 operation="compare",
-                metadata={"strategy": "quick", "ratio": 1.0},
+                metadata={"strategy": "quick", "branch": branch},
             )
             if value_of(arr[index]) == value_of(pivot):
                 equal.append(arr[index])
@@ -206,21 +326,6 @@ class QuickMergeSort(SortAlgorithm):
             else:
                 greater.append(arr[index])
         ratio = max(len(less), len(greater)) / max(1, min(len(less), len(greater)) or 1)
-        if ratio > 3:
-            ordered = sorted_values(arr[lo:hi], ascending)
-            for offset, value in enumerate(ordered):
-                arr[lo + offset] = value
-                yield base_frame(
-                    arr,
-                    swapped=[lo + offset],
-                    partition_bounds=(lo, hi - 1),
-                    recursion_depth=depth,
-                    aux_array=ordered,
-                    explanation=f"{self.name}: unbalanced partition; merge-sorting this subproblem.",
-                    operation="write",
-                    metadata={"strategy": "merge", "ratio": ratio},
-                )
-            return
         merged = less + equal + greater
         for offset, value in enumerate(merged):
             arr[lo + offset] = value
@@ -233,8 +338,96 @@ class QuickMergeSort(SortAlgorithm):
                 operation="write",
                 metadata={"strategy": "quick", "ratio": ratio},
             )
-        yield from self._sort(arr, lo, lo + len(less), ascending, depth + 1)
-        yield from self._sort(arr, lo + len(less) + len(equal), hi, ascending, depth + 1)
+        if ratio > 3:
+            yield base_frame(
+                arr,
+                partition_bounds=(lo, hi - 1),
+                recursion_depth=depth,
+                aux_array=merged,
+                explanation=f"{self.name}: unbalanced partition; merge-sorting both sides separately.",
+                operation="read",
+                metadata={"strategy": "merge", "ratio": ratio},
+            )
+            yield from self._small_merge(arr, lo, lo + len(less), ascending, depth + 1, "left_merge")
+            yield from self._small_merge(
+                arr, lo + len(less) + len(equal), hi, ascending, depth + 1, "right_merge"
+            )
+            return
+        yield from self._sort(arr, lo, lo + len(less), ascending, depth + 1, "left")
+        yield from self._sort(arr, lo + len(less) + len(equal), hi, ascending, depth + 1, "right")
+
+    def _small_merge(
+        self,
+        arr: list[Any],
+        lo: int,
+        hi: int,
+        ascending: bool,
+        depth: int,
+        branch: str,
+    ) -> Generator[SortFrame, None, None]:
+        width = 1
+        while width < hi - lo:
+            for left in range(lo, hi, 2 * width):
+                mid = min(left + width, hi)
+                right = min(left + 2 * width, hi)
+                if mid >= right:
+                    continue
+                left_run = arr[left:mid]
+                right_run = arr[mid:right]
+                i = j = 0
+                out = left
+                aux: list[Any] = []
+                while i < len(left_run) and j < len(right_run):
+                    yield base_frame(
+                        arr,
+                        highlighted=[left + i, mid + j],
+                        partition_bounds=(lo, hi - 1),
+                        recursion_depth=depth,
+                        aux_array=aux,
+                        explanation=f"{self.name}: merge phase compares small-partition run heads.",
+                        operation="compare",
+                        metadata={"strategy": "merge", "branch": branch, "width": width},
+                    )
+                    if (
+                        value_of(left_run[i]) <= value_of(right_run[j])
+                        if ascending
+                        else value_of(left_run[i]) >= value_of(right_run[j])
+                    ):
+                        aux.append(left_run[i])
+                        i += 1
+                    else:
+                        aux.append(right_run[j])
+                        j += 1
+                    arr[out] = aux[-1]
+                    yield base_frame(
+                        arr,
+                        swapped=[out],
+                        partition_bounds=(lo, hi - 1),
+                        recursion_depth=depth,
+                        aux_array=aux,
+                        explanation=f"{self.name}: merge phase writes a small-partition value.",
+                        operation="write",
+                        metadata={"strategy": "merge", "branch": branch, "width": width},
+                    )
+                    out += 1
+                for value in left_run[i:] + right_run[j:]:
+                    aux.append(value)
+                    arr[out] = value
+                    yield base_frame(
+                        arr,
+                        swapped=[out],
+                        partition_bounds=(lo, hi - 1),
+                        recursion_depth=depth,
+                        aux_array=aux,
+                        explanation=f"{self.name}: merge phase copies a remaining small-partition value.",
+                        operation="write",
+                        metadata={"strategy": "merge", "branch": branch, "width": width},
+                    )
+                    out += 1
+            width *= 2
+
+    def get_invariant(self) -> str:
+        return "Large partitions use quicksort partitioning; small or unbalanced partitions switch to merge sort."
 
 
 class BinaryInsertionSort(SortAlgorithm):
@@ -284,6 +477,9 @@ class BinaryInsertionSort(SortAlgorithm):
                 metadata={"binary_search_steps": steps},
             )
         yield done_frame(arr, self.name)
+
+    def get_invariant(self) -> str:
+        return "Elements arr[0..i] are sorted; the insertion position is found by binary search in O(log i) comparisons."
 
 
 class QuickHeapSort(SortAlgorithm):
@@ -358,6 +554,9 @@ class QuickHeapSort(SortAlgorithm):
         )
         yield from self._quick(arr, lo, i - 1, ascending, depth + 1)
         yield from self._quick(arr, i + 1, hi, ascending, depth + 1)
+
+    def get_invariant(self) -> str:
+        return "A pivot partitions the array; the larger partition is heapified and extracted rather than recursed into."
 
 
 _ITEMS = [

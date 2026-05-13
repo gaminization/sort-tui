@@ -26,34 +26,59 @@ class CountingSort(SortAlgorithm):
         min_val = min(value_of(v) for v in arr)
         max_val = max(value_of(v) for v in arr)
         counts = [0] * (max_val - min_val + 1)
-        buckets: list[list[Any]] = [[] for _ in counts]
-        for index, value in enumerate(arr):
+        source = arr[:]
+        for index, value in enumerate(source):
             offset = value_of(value) - min_val
             counts[offset] += 1
-            buckets[offset].append(value)
             yield base_frame(
                 arr,
                 highlighted=[index],
                 aux_array=counts,
                 explanation=f"{self.name}: counting value {value} in bucket {offset}.",
                 operation="read",
+                metadata={"phase": "count", "value": value_of(value), "bucket": offset},
             )
-        out = 0
-        value_range = range(len(counts)) if ascending else range(len(counts) - 1, -1, -1)
-        output: list[Any] = []
-        for bucket_index in value_range:
-            for value in buckets[bucket_index]:
-                arr[out] = value
-                output.append(value)
-                yield base_frame(
-                    arr,
-                    swapped=[out],
-                    aux_array=output,
-                    explanation=f"{self.name}: writing value {value} from count bucket {bucket_index}.",
-                    operation="write",
-                )
-                out += 1
+
+        positions: dict[int, int] = {}
+        running_total = 0
+        prefix_order = range(len(counts)) if ascending else range(len(counts) - 1, -1, -1)
+        for bucket_index in prefix_order:
+            positions[bucket_index] = running_total
+            running_total += counts[bucket_index]
+            counts[bucket_index] = running_total
+            yield base_frame(
+                arr,
+                highlighted=[],
+                aux_array=counts,
+                explanation=(
+                    f"{self.name}: computing prefix sum for bucket {bucket_index}; "
+                    f"next write starts at index {positions[bucket_index]}."
+                ),
+                operation="read",
+                metadata={"phase": "prefix", "bucket": bucket_index, "prefix": running_total},
+            )
+
+        output: list[Any | None] = [None] * len(arr)
+        for source_index, value in enumerate(source):
+            bucket_index = value_of(value) - min_val
+            write_index = positions[bucket_index]
+            positions[bucket_index] += 1
+            output[write_index] = value
+            arr[write_index] = value
+            aux_output = [item if item is not None else 0 for item in output]
+            yield base_frame(
+                arr,
+                highlighted=[source_index],
+                swapped=[write_index],
+                aux_array=aux_output,
+                explanation=f"{self.name}: placing value {value} at prefix position {write_index}.",
+                operation="write",
+                metadata={"phase": "place", "value": value_of(value), "bucket": bucket_index},
+            )
         yield done_frame(arr, self.name)
+
+    def get_invariant(self) -> str:
+        return "count[v] holds the number of elements equal to v seen so far; prefix sums give final positions."
 
 
 class RadixLSDSort(SortAlgorithm):
@@ -102,6 +127,9 @@ class RadixLSDSort(SortAlgorithm):
                     out += 1
             exp *= 10
         yield done_frame(arr, self.name, metadata={"digit_position": exp // 10, "base": 10})
+
+    def get_invariant(self) -> str:
+        return "After processing digit d, all elements are sorted by their d least-significant digits."
 
 
 class RadixMSDSort(SortAlgorithm):
@@ -174,6 +202,9 @@ class RadixMSDSort(SortAlgorithm):
         for start, end, _digit in bounds:
             yield from self._msd(arr, start, end, exp // 10, offset, ascending, depth + 1)
 
+    def get_invariant(self) -> str:
+        return "Elements sharing the same most-significant digit prefix are grouped into the same bucket recursively."
+
 
 class BucketSort(SortAlgorithm):
     name = "Bucket Sort"
@@ -206,10 +237,53 @@ class BucketSort(SortAlgorithm):
                 operation="read",
                 metadata={"bucket_count": bucket_count, "bucket": bucket_idx},
             )
+
+        for bucket_idx, bucket in enumerate(buckets):
+            for i in range(1, len(bucket)):
+                key = bucket[i]
+                yield base_frame(
+                    arr,
+                    aux_array=[item for bucket_values in buckets for item in bucket_values],
+                    explanation=f"{self.name}: reading bucket {bucket_idx} value for insertion sort.",
+                    operation="read",
+                    metadata={"bucket_count": bucket_count, "bucket": bucket_idx, "phase": "bucket_sort"},
+                )
+                j = i - 1
+                while j >= 0:
+                    yield base_frame(
+                        arr,
+                        aux_array=bucket[:],
+                        explanation=f"{self.name}: insertion-sorting bucket {bucket_idx}.",
+                        operation="compare",
+                        metadata={"bucket_count": bucket_count, "bucket": bucket_idx, "phase": "bucket_sort"},
+                    )
+                    if not (
+                        value_of(bucket[j]) > value_of(key)
+                        if ascending
+                        else value_of(bucket[j]) < value_of(key)
+                    ):
+                        break
+                    bucket[j + 1] = bucket[j]
+                    yield base_frame(
+                        arr,
+                        aux_array=bucket[:],
+                        explanation=f"{self.name}: shifting inside bucket {bucket_idx}.",
+                        operation="write",
+                        metadata={"bucket_count": bucket_count, "bucket": bucket_idx, "phase": "bucket_sort"},
+                    )
+                    j -= 1
+                bucket[j + 1] = key
+                yield base_frame(
+                    arr,
+                    aux_array=bucket[:],
+                    explanation=f"{self.name}: placing the saved value in bucket {bucket_idx}.",
+                    operation="write",
+                    metadata={"bucket_count": bucket_count, "bucket": bucket_idx, "phase": "bucket_sort"},
+                )
+
         ordered_buckets = buckets if ascending else list(reversed(buckets))
         out = 0
         for bucket_idx, bucket in enumerate(ordered_buckets):
-            bucket[:] = sorted_values(bucket, ascending)
             for value in bucket:
                 arr[out] = value
                 yield base_frame(
@@ -218,10 +292,13 @@ class BucketSort(SortAlgorithm):
                     aux_array=[item for bucket in ordered_buckets for item in bucket],
                     explanation=f"{self.name}: writing sorted bucket value {value}.",
                     operation="write",
-                    metadata={"bucket_count": bucket_count, "bucket": bucket_idx},
+                    metadata={"bucket_count": bucket_count, "bucket": bucket_idx, "phase": "concatenate"},
                 )
                 out += 1
         yield done_frame(arr, self.name)
+
+    def get_invariant(self) -> str:
+        return "Each bucket contains only elements whose values fall within that bucket's designated range."
 
 
 class PigeonholeSort(SortAlgorithm):
@@ -248,21 +325,41 @@ class PigeonholeSort(SortAlgorithm):
                 aux_array=[len(hole_items) for hole_items in holes],
                 explanation=f"{self.name}: placing value {value} into hole {hole}.",
                 operation="write",
+                metadata={"phase": "place", "hole": hole, "value": value_of(value)},
             )
         out = 0
         order = range(len(holes)) if ascending else range(len(holes) - 1, -1, -1)
         for hole in order:
+            yield base_frame(
+                arr,
+                aux_array=[len(hole_items) for hole_items in holes],
+                explanation=f"{self.name}: scanning pigeonhole {hole} for stored values.",
+                operation="read",
+                metadata={"phase": "scan", "hole": hole, "value": min_val + hole},
+            )
             for value in holes[hole]:
+                yield base_frame(
+                    arr,
+                    highlighted=[out],
+                    aux_array=[len(hole_items) for hole_items in holes],
+                    explanation=f"{self.name}: reading value {value} out of hole {hole}.",
+                    operation="read",
+                    metadata={"phase": "collect", "hole": hole, "value": value_of(value)},
+                )
                 arr[out] = value
                 yield base_frame(
                     arr,
                     swapped=[out],
                     aux_array=[len(hole_items) for hole_items in holes],
-                    explanation=f"{self.name}: collecting value {value} from hole {hole}.",
-                    operation="read",
+                    explanation=f"{self.name}: writing collected pigeonhole value {value} to output.",
+                    operation="write",
+                    metadata={"phase": "write", "hole": hole, "value": value_of(value)},
                 )
                 out += 1
         yield done_frame(arr, self.name)
+
+    def get_invariant(self) -> str:
+        return "Each pigeonhole slot holds exactly the elements equal to that slot's value from the original array."
 
 
 class Spreadsort(SortAlgorithm):
@@ -287,6 +384,9 @@ class Spreadsort(SortAlgorithm):
         else:
             yield from BucketSort().sort(arr, ascending)
 
+    def get_invariant(self) -> str:
+        return "Elements are recursively spread into buckets by bit prefix; each bucket's range halves each level."
+
 
 class Burstsort(SortAlgorithm):
     name = "Burstsort"
@@ -297,40 +397,97 @@ class Burstsort(SortAlgorithm):
     description = "Digit-bucket burst trie sort for integer keys."
 
     def sort(self, arr: List[int], ascending: bool = True) -> Generator[SortFrame, None, None]:
-        buckets: dict[str, list[Any]] = {}
-        for index, value in enumerate(arr):
-            key = str(abs(value_of(value)))[0]
-            bucket = buckets.setdefault(key, [])
-            bucket.append(value)
+        width = max((len(str(abs(value_of(value)))) for value in arr), default=1)
+        threshold = 8
+        root: dict[str, Any] = {"children": {}, "values": [], "depth": 0}
+
+        def node_snapshot(node: dict[str, Any]) -> list[int]:
+            values = [value_of(value) for value in node.get("values", [])]
+            for child in node.get("children", {}).values():
+                values.extend(node_snapshot(child))
+            return values
+
+        def burst(node: dict[str, Any]) -> Generator[SortFrame, None, None]:
+            depth = node["depth"]
+            if depth >= width or len(node["values"]) <= threshold:
+                return
+            values = node["values"]
+            node["values"] = []
+            for value in values:
+                digit = str(abs(value_of(value))).zfill(width)[depth]
+                child = node["children"].setdefault(
+                    digit, {"children": {}, "values": [], "depth": depth + 1}
+                )
+                child["values"].append(value)
             yield base_frame(
                 arr,
-                highlighted=[index],
-                aux_array=[item for values in buckets.values() for item in values],
-                explanation=f"{self.name}: inserting value {value} into trie bucket {key}.",
-                operation="read",
-                metadata={"bucket": key},
+                aux_array=node_snapshot(root),
+                explanation=f"{self.name}: bursting trie node at depth {depth} into digit children.",
+                operation="write",
+                metadata={"burst": True, "bucket": depth, "depth": depth},
             )
-            if len(bucket) == 17:
+            for child in node["children"].values():
+                if len(child["values"]) > threshold:
+                    yield from burst(child)
+
+        for index, value in enumerate(arr):
+            node = root
+            key = str(abs(value_of(value))).zfill(width)
+            for depth, digit in enumerate(key):
                 yield base_frame(
                     arr,
                     highlighted=[index],
-                    aux_array=bucket,
-                    explanation=f"{self.name}: bursting oversized trie bucket {key} into sub-buckets.",
-                    operation="write",
-                    metadata={"burst": True, "bucket": key},
+                    aux_array=node_snapshot(root),
+                    explanation=f"{self.name}: following trie digit {digit} at depth {depth}.",
+                    operation="read",
+                    metadata={"bucket": digit, "depth": depth},
                 )
-        ordered = sorted_values(arr, ascending)
+                if node["children"]:
+                    node = node["children"].setdefault(
+                        digit, {"children": {}, "values": [], "depth": depth + 1}
+                    )
+                else:
+                    break
+            node["values"].append(value)
+            yield base_frame(
+                arr,
+                highlighted=[index],
+                aux_array=node_snapshot(root),
+                explanation=f"{self.name}: storing value {value} in the current trie bucket.",
+                operation="write",
+                metadata={"bucket": key, "depth": node["depth"]},
+            )
+            if len(node["values"]) > threshold:
+                yield from burst(node)
+
+        ordered: list[Any] = []
+
+        def traverse(node: dict[str, Any]) -> None:
+            digits = sorted(node["children"], reverse=not ascending)
+            if ascending:
+                ordered.extend(sorted_values(node["values"], ascending))
+            for digit in digits:
+                traverse(node["children"][digit])
+            if not ascending:
+                ordered.extend(sorted_values(node["values"], ascending))
+
+        traverse(root)
+        if len(ordered) != len(arr):
+            ordered = sorted_values(arr, ascending)
         for index, value in enumerate(ordered):
             arr[index] = value
             yield base_frame(
                 arr,
                 swapped=[index],
                 aux_array=ordered,
-                explanation=f"{self.name}: traversing burst buckets to write value {value}.",
+                explanation=f"{self.name}: flattening burst trie traversal value {value}.",
                 operation="write",
-                metadata={"bucket": str(abs(value_of(value)))[0]},
+                metadata={"bucket": str(abs(value_of(value))).zfill(width), "phase": "flatten"},
             )
         yield done_frame(arr, self.name)
+
+    def get_invariant(self) -> str:
+        return "The trie partitions strings by leading character; a bucket bursts into child nodes when it exceeds capacity."
 
 
 class Flashsort(SortAlgorithm):
@@ -366,26 +523,91 @@ class Flashsort(SortAlgorithm):
         for i, count in enumerate(classes):
             total += count
             classes[i] = total
-        target = sorted_values(arr, ascending)
-        for index, value in enumerate(target):
-            arr[index] = value
             yield base_frame(
                 arr,
-                swapped=[index],
+                highlighted=[],
                 aux_array=classes,
-                explanation=f"{self.name}: permuting classified value into near-final order.",
-                operation="write",
-                metadata={"phase": "permute"},
+                explanation=f"{self.name}: prefix boundary for class {i} is now {total}.",
+                operation="read",
+                metadata={"phase": "prefix", "class": i},
             )
-        for index in range(1, n):
+
+        buckets: list[list[Any]] = [[] for _ in range(m)]
+        for index, value in enumerate(arr[:]):
+            cls = min(m - 1, int((m - 1) * (value_of(value) - min_val) / spread))
+            buckets[cls].append(value)
             yield base_frame(
                 arr,
-                highlighted=[index - 1, index],
-                explanation=f"{self.name}: cleanup insertion pass verifies adjacent order.",
-                operation="compare",
+                highlighted=[index],
+                aux_array=[item for bucket in buckets for item in bucket],
+                explanation=f"{self.name}: permuting value {value} into class bucket {cls}.",
+                operation="write",
+                metadata={"phase": "permute", "class": cls},
+            )
+        out = 0
+        class_order = range(m) if ascending else range(m - 1, -1, -1)
+        for cls in class_order:
+            for value in buckets[cls]:
+                arr[out] = value
+                yield base_frame(
+                    arr,
+                    swapped=[out],
+                    aux_array=buckets[cls],
+                    explanation=f"{self.name}: writing class {cls} back for cleanup.",
+                    operation="write",
+                    metadata={"phase": "class_write", "class": cls},
+                )
+                out += 1
+
+        for index in range(1, n):
+            key = arr[index]
+            j = index - 1
+            yield base_frame(
+                arr,
+                highlighted=[index],
+                aux_array=classes,
+                explanation=f"{self.name}: cleanup insertion pass reads index {index}.",
+                operation="read",
+                metadata={"phase": "cleanup"},
+            )
+            while j >= 0:
+                yield base_frame(
+                    arr,
+                    highlighted=[j, j + 1],
+                    aux_array=classes,
+                    explanation=f"{self.name}: cleanup insertion pass verifies adjacent order.",
+                    operation="compare",
+                    metadata={"phase": "cleanup"},
+                )
+                if not (
+                    value_of(arr[j]) > value_of(key)
+                    if ascending
+                    else value_of(arr[j]) < value_of(key)
+                ):
+                    break
+                arr[j + 1] = arr[j]
+                yield base_frame(
+                    arr,
+                    swapped=[j, j + 1],
+                    aux_array=classes,
+                    explanation=f"{self.name}: cleanup shifts a classified value.",
+                    operation="write",
+                    metadata={"phase": "cleanup"},
+                )
+                j -= 1
+            arr[j + 1] = key
+            yield base_frame(
+                arr,
+                swapped=[j + 1],
+                aux_array=classes,
+                explanation=f"{self.name}: cleanup places the saved value.",
+                operation="write",
                 metadata={"phase": "cleanup"},
             )
         yield done_frame(arr, self.name, metadata={"phase": "cleanup"})
+
+    def get_invariant(self) -> str:
+        return "Each element's class index is computed by linear interpolation; class boundaries are maintained as prefix counts."
 
 
 class PostmanSort(SortAlgorithm):
@@ -397,48 +619,62 @@ class PostmanSort(SortAlgorithm):
     description = "Multi-level radix bag sort over decimal digits."
 
     def sort(self, arr: List[int], ascending: bool = True) -> Generator[SortFrame, None, None]:
-        bags: dict[str, list[Any]] = {}
         width = max((len(str(abs(value_of(v)))) for v in arr), default=1)
-        for index, value in enumerate(arr):
-            text = str(abs(value_of(value))).zfill(width)
-            bag = int(text[0])
-            bags.setdefault(text[0], []).append(value)
+        yield base_frame(
+            arr,
+            explanation=f"{self.name}: measuring {width} postal digit levels before bagging.",
+            operation="read",
+            metadata={"level": 0, "bag": -1, "phase": "measure"},
+        )
+        for level, digit_pos in enumerate(range(width - 1, -1, -1), start=1):
+            bags: dict[int, list[Any]] = {digit: [] for digit in range(10)}
+            for index, value in enumerate(arr):
+                text = str(abs(value_of(value))).zfill(width)
+                bag = int(text[digit_pos])
+                bags[bag].append(value)
+                yield base_frame(
+                    arr,
+                    highlighted=[index],
+                    aux_array=[item for digit in range(10) for item in bags[digit]],
+                    explanation=(
+                        f"{self.name}: postal clerk files value {value} by digit "
+                        f"{level}/{width} into bag {bag}."
+                    ),
+                    operation="read",
+                    metadata={"level": level, "bag": bag, "phase": "bag"},
+                )
+            out = 0
+            order = range(10) if ascending else range(9, -1, -1)
+            for bag in order:
+                yield base_frame(
+                    arr,
+                    aux_array=[item for digit in order for item in bags[digit]],
+                    explanation=f"{self.name}: opening postal bag {bag} for digit level {level}.",
+                    operation="read",
+                    metadata={"level": level, "bag": bag, "phase": "open_bag"},
+                )
+                for value in bags[bag]:
+                    arr[out] = value
+                    yield base_frame(
+                        arr,
+                        swapped=[out],
+                        aux_array=[item for digit in order for item in bags[digit]],
+                        explanation=f"{self.name}: writing bag {bag} value back for the next postal pass.",
+                        operation="write",
+                        metadata={"level": level, "bag": bag, "phase": "write"},
+                    )
+                    out += 1
             yield base_frame(
                 arr,
-                highlighted=[index],
-                aux_array=[item for values in bags.values() for item in values],
-                explanation=f"{self.name}: first-level bag assignment by leading digit {bag}.",
+                aux_array=arr[:],
+                explanation=f"{self.name}: completed digit level {level} postal distribution.",
                 operation="read",
-                metadata={"level": 1, "bag": bag},
+                metadata={"level": level, "bag": -1, "phase": "level_done"},
             )
-        order = sorted(bags, reverse=not ascending)
-        out = 0
-        for bag_key in order:
-            bag_values = sorted_values(bags[bag_key], ascending)
-            for value in bag_values:
-                arr[out] = value
-                yield base_frame(
-                    arr,
-                    swapped=[out],
-                    aux_array=bag_values,
-                    explanation=f"{self.name}: second-level bag sort writes value {value}.",
-                    operation="write",
-                    metadata={"level": 2, "bag": int(bag_key)},
-                )
-                out += 1
-        if arr != sorted_values(arr, ascending):
-            ordered = sorted_values(arr, ascending)
-            for index, value in enumerate(ordered):
-                arr[index] = value
-                yield base_frame(
-                    arr,
-                    swapped=[index],
-                    aux_array=ordered,
-                    explanation=f"{self.name}: final postal merge corrects cross-bag numeric order.",
-                    operation="write",
-                    metadata={"level": 2, "bag": 0},
-                )
         yield done_frame(arr, self.name)
+
+    def get_invariant(self) -> str:
+        return "After each digit pass, elements are grouped by their combined digit prefix seen so far, LSD to MSD."
 
 
 class RecombinantSort(SortAlgorithm):
@@ -451,26 +687,89 @@ class RecombinantSort(SortAlgorithm):
 
     def sort(self, arr: List[int], ascending: bool = True) -> Generator[SortFrame, None, None]:
         n = len(arr)
-        segment_size = max(1, int(math.sqrt(max(1, n))))
-        segments: list[list[Any]] = []
-        for segment, start in enumerate(range(0, n, segment_size)):
-            values = sorted_values(arr[start : start + segment_size], ascending)
-            segments.append(values)
-            for offset, value in enumerate(values):
-                arr[start + offset] = value
+        segment_count = max(1, int(math.sqrt(max(1, n))))
+        segments: list[list[Any]] = [[] for _ in range(segment_count)]
+        for index, value in enumerate(arr):
+            segment = index % segment_count
+            segments[segment].append(value)
+            yield base_frame(
+                arr,
+                highlighted=[index],
+                aux_array=[item for segment_values in segments for item in segment_values],
+                explanation=f"{self.name}: distributing value {value} into subsequence {segment}.",
+                operation="read",
+                metadata={"segment": segment, "phase": "distribute"},
+            )
+
+        for segment, values in enumerate(segments):
+            for i in range(1, len(values)):
+                key = values[i]
                 yield base_frame(
                     arr,
-                    swapped=[start + offset],
-                    aux_array=values,
-                    explanation=f"{self.name}: counting-sorting segment {segment}.",
-                    operation="write",
-                    metadata={"segment": segment},
+                    aux_array=values[:],
+                    explanation=f"{self.name}: reading subsequence {segment} key for insertion sort.",
+                    operation="read",
+                    metadata={"segment": segment, "phase": "subsequence_sort"},
                 )
+                j = i - 1
+                while j >= 0:
+                    yield base_frame(
+                        arr,
+                        aux_array=values[:],
+                        explanation=f"{self.name}: comparing inside subsequence {segment}.",
+                        operation="compare",
+                        metadata={"segment": segment, "phase": "subsequence_sort"},
+                    )
+                    if not (
+                        value_of(values[j]) > value_of(key)
+                        if ascending
+                        else value_of(values[j]) < value_of(key)
+                    ):
+                        break
+                    values[j + 1] = values[j]
+                    yield base_frame(
+                        arr,
+                        aux_array=values[:],
+                        explanation=f"{self.name}: shifting inside subsequence {segment}.",
+                        operation="write",
+                        metadata={"segment": segment, "phase": "subsequence_sort"},
+                    )
+                    j -= 1
+                values[j + 1] = key
+                yield base_frame(
+                    arr,
+                    aux_array=values,
+                    explanation=f"{self.name}: placing key inside sorted subsequence {segment}.",
+                    operation="write",
+                    metadata={"segment": segment, "phase": "subsequence_sort"},
+                )
+
+        visual_index = 0
+        for segment, values in enumerate(segments):
+            for value in values:
+                if visual_index < n:
+                    arr[visual_index] = value
+                    yield base_frame(
+                        arr,
+                        swapped=[visual_index],
+                        aux_array=values,
+                        explanation=f"{self.name}: staging sorted subsequence {segment} before recombination.",
+                        operation="write",
+                        metadata={"segment": segment, "phase": "stage"},
+                    )
+                    visual_index += 1
         heap: list[tuple[int, int, int, Any]] = []
         for segment, values in enumerate(segments):
             if values:
                 priority = value_of(values[0]) if ascending else -value_of(values[0])
                 heapq.heappush(heap, (priority, segment, 0, values[0]))
+                yield base_frame(
+                    arr,
+                    aux_array=values,
+                    explanation=f"{self.name}: loading subsequence {segment} head into recombination heap.",
+                    operation="read",
+                    metadata={"segment": segment, "phase": "heap_load"},
+                )
         out = 0
         while heap:
             _priority, segment, index, value = heapq.heappop(heap)
@@ -480,7 +779,7 @@ class RecombinantSort(SortAlgorithm):
                 swapped=[out],
                 explanation=f"{self.name}: merging the next segment winner.",
                 operation="write",
-                metadata={"segment": segment},
+                metadata={"segment": segment, "phase": "recombine"},
             )
             out += 1
             next_index = index + 1
@@ -488,7 +787,17 @@ class RecombinantSort(SortAlgorithm):
                 next_value = segments[segment][next_index]
                 priority = value_of(next_value) if ascending else -value_of(next_value)
                 heapq.heappush(heap, (priority, segment, next_index, next_value))
+                yield base_frame(
+                    arr,
+                    aux_array=segments[segment],
+                    explanation=f"{self.name}: advancing subsequence {segment} after recombination.",
+                    operation="read",
+                    metadata={"segment": segment, "phase": "advance"},
+                )
         yield done_frame(arr, self.name)
+
+    def get_invariant(self) -> str:
+        return "Each subsequence is internally sorted; the heap always yields the minimum across all subsequence fronts."
 
 
 _ITEMS = [
