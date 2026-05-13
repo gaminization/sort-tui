@@ -12,14 +12,14 @@ class TaggedValue(int):
 
     def __new__(cls, value: int, tag: str = "", original_index: int = 0):
         obj = int.__new__(cls, value)
-        obj.value = int(value)
-        obj.tag = tag
-        obj.original_index = original_index
+        obj.value = int(value)  # type: ignore[attr-defined]
+        obj.tag = tag  # type: ignore[attr-defined]
+        obj.original_index = original_index  # type: ignore[attr-defined]
         return obj
 
     @property
     def label(self) -> str:
-        return f"{self.value}{self.tag}"
+        return f"{self.value}{self.tag}"  # type: ignore[attr-defined]
 
     def __repr__(self) -> str:
         return self.label

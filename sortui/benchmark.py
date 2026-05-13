@@ -70,6 +70,8 @@ def run_benchmark(
     results: list[BenchmarkResult] = []
 
     for key in algorithm_keys:
+        if str(distribution).lower().replace("-", "_").replace(" ", "_") == "worst_case":
+            base_array = generate_array(size, distribution, seed=seed, algorithm=get_algorithm(key)())
         stats_runs: list[SortStats] = []
         measured_runs: list[float] = []
         for _ in range(max(1, iterations)):
@@ -151,4 +153,3 @@ def complexity_plot(
             "ms:    " + value_labels,
         ]
     )
-

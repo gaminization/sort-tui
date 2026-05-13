@@ -16,7 +16,7 @@ def default_export_path() -> Path:
 
 def _jsonable(value: Any) -> Any:
     if dataclasses.is_dataclass(value):
-        return _jsonable(dataclasses.asdict(value))
+        return _jsonable(dataclasses.asdict(value))  # type: ignore[arg-type]
     if isinstance(value, dict):
         return {str(key): _jsonable(val) for key, val in value.items()}
     if isinstance(value, (list, tuple)):
