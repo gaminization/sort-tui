@@ -2,6 +2,10 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from sortui.algorithms.base import SortFrame
 
 
 @dataclass
@@ -15,7 +19,7 @@ class SortStats:
     def elapsed_ms(self) -> float:
         return (time.time() - self.start_time) * 1000
 
-    def update(self, frame: "SortFrame") -> None:  # noqa: F821
+    def update(self, frame: "SortFrame") -> None:
         self.frames += 1
         op = frame.operation
         if op == "compare":

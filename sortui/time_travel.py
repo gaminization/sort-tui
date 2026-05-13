@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import json
+
+
 class TimeTravelEngine:
     """Buffers generator output so the user can step forward and backward."""
+
 
     def __init__(self, algorithm, array, ascending: bool = True):
         self._history: list = []

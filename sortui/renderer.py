@@ -172,6 +172,7 @@ class Renderer:
         stability_status: str | None = None,
         status_message: str = "",
         recommended: str | None = None,
+        audio_enabled: bool = False,
     ) -> None:
         """Render one complete frame to *stdscr*."""
         stdscr.erase()
@@ -417,11 +418,14 @@ class Renderer:
         ctrl_str = (
             " [SPC] Pause  [→] Step  [←] Back  [R] Reset  [Q] Quit  [+/-] Speed  [V] View  [S] Stable  [M] Audio  [E] Export  [?] Help"
         )
+        audio_str = "[audio: ON]" if audio_enabled else "[audio: OFF]"
+        
+        # Draw controls on the left, audio on the right
         _safe_addstr(
             stdscr,
             ctrl_row,
             0,
-            ctrl_str[: cols - 1],
+            ctrl_str[: cols - len(audio_str) - 2].ljust(cols - len(audio_str) - 1) + audio_str + " ",
             curses.color_pair(PAIR_DIM) | curses.A_DIM,
         )
 

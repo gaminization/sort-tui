@@ -7,7 +7,7 @@ from typing import Optional
 
 from sortui.algorithms import get_algorithm
 from sortui.algorithms.base import SortAlgorithm, SortFrame
-from sortui.audio import play_value_async
+from sortui.audio import is_available, play_note
 from sortui.export import default_export_path, export_run
 from sortui.genome import analyze_frames
 from sortui.input_generator import InputDistribution, generate_array
@@ -99,6 +99,7 @@ class Controller:
         self._stability_tracker: Optional[StabilityTracker] = None
         self._status_message: str = ""
         self._recommended: str = ""
+        self._last_audio_time: float = 0.0
         # Tracks the seed actually used by the most-recent engine so that
         # Shift+R ("same seed restart") can reproduce the exact same array.
         self._last_seed: Optional[int] = seed
@@ -116,17 +117,12 @@ class Controller:
         return max(10, cols - 2)
 
     def _maybe_play_audio(self, frame: SortFrame) -> None:
-        if frame.operation != "swap" or not frame.array:
-            return
-        idx = frame.swapped[0] if frame.swapped else 0
-        idx = max(0, min(len(frame.array) - 1, idx))
-        play_value_async(
-            int(frame.array[idx]),
-            max(int(value) for value in frame.array) or 1,
-            enabled=self.audio_enabled,
-            min_freq=self.audio_min_freq,
-            max_freq=self.audio_max_freq,
-        )
+        if self.audio_enabled and frame.operation in ('swap', 'compare'):
+            if frame.highlighted and frame.array:
+                idx = frame.highlighted[0]
+                if 0 <= idx < len(frame.array):
+                    val = frame.array[idx]
+                    play_note(val, min(frame.array), max(frame.array))
 
     def _new_engine(self, cols: int, new_seed: bool = True) -> None:
         """Tear down the current engine and create a fresh one.
@@ -163,7 +159,7 @@ class Controller:
             arr = generate_array(size, self.distribution, seed=self._last_seed, algorithm=alg)
 
         if self.stability_mode:
-            arr = tag_duplicates(arr)
+            arr = tag_duplicates(arr)  # type: ignore[assignment]
         self._recommended = recommendation_text(arr)
 
         if self._comparison_mode:
@@ -226,13 +222,15 @@ class Controller:
             if key == curses.KEY_RESIZE:
                 # Rebuild engine for new width; keep the same seed so the
                 # array shape is consistent (element count may change though).
+                _rows, cols = stdscr.getmaxyx()
                 self._new_engine(cols, new_seed=False)
                 alg = self._get_algorithm()
                 continue
 
             # ── Quit ───────────────────────────────────────────────────────
             elif key in (ord("q"), ord("Q"), 27):  # 27 = ESC
-                break
+                # curses.wrapper restores the terminal and calls endwin().
+                return
 
             # ── Help overlay toggle ────────────────────────────────────────
             elif key == ord("?"):
@@ -252,14 +250,12 @@ class Controller:
                             self._compare_current_frames[idx] = f
                             self._compare_frame_nums[idx] += 1
                             self._maybe_play_audio(f)
-                            self._maybe_play_audio(f)
                 elif self._engine:
                     f = self._engine.advance()
                     if f is not None:
                         self._stats.update(f)
                         self._current_frame = f
                         self._frame_num += 1
-                        self._maybe_play_audio(f)
                         self._maybe_play_audio(f)
 
             # ── Step backward (paused) ─────────────────────────────────────
@@ -408,6 +404,7 @@ class Controller:
                             self._compare_stats[idx].update(f)
                             self._compare_current_frames[idx] = f
                             self._compare_frame_nums[idx] += 1
+                            self._maybe_play_audio(f)
                     if self._compare_current_frames:
                         self._current_frame = self._compare_current_frames[0]
                         self._stats = self._compare_stats[0]
@@ -418,6 +415,7 @@ class Controller:
                         self._stats.update(f)
                         self._current_frame = f
                         self._frame_num += 1
+                        self._maybe_play_audio(f)
                     # When the engine is exhausted we keep showing the last
                     # frame; no automatic pause so the user can still interact.
 
@@ -488,6 +486,7 @@ class Controller:
                 stability_status=stability_status,
                 status_message=self._status_message,
                 recommended=self._recommended,
+                audio_enabled=self.audio_enabled,
             )
             if self._show_help:
                 self._renderer.draw_help_overlay(stdscr)
