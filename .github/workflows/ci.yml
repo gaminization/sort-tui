@@ -17,5 +17,52 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - run: python -m pip install --upgrade pip
       - run: python -m pip install -e ".[dev]"
-      - run: pytest
 
+      - name: Ruff Linting
+        run: ruff check sortui tests
+
+      - name: Mypy Type Checking
+        run: mypy sortui --ignore-missing-imports
+
+      - name: Pytest (Quiet)
+        run: pytest -q
+
+      - name: Pytest (Coverage Gate)
+        run: pytest --cov=sortui --cov-fail-under=85
+
+      - name: Verify Algorithm Catalog Size
+        run: python3 -c "from sortui.algorithms import ALGORITHMS; assert len(ALGORITHMS) >= 100"
+
+      - name: Algorithm Correctness Sweep
+        run: |
+          python3 -c "
+          from sortui.algorithms import CATEGORY_ALGORITHMS, JOKE_ALGORITHMS
+          import random
+          
+          def is_sorted(arr):
+              return all(arr[i] <= arr[i+1] for i in range(len(arr)-1))
+          
+          all_algos = []
+          for cat, algos in CATEGORY_ALGORITHMS.items():
+              for key, algo_cls in algos.items():
+                  if key not in JOKE_ALGORITHMS:
+                      all_algos.append(algo_cls)
+          
+          print(f'Checking {len(all_algos)} algorithms...')
+          for algo_cls in all_algos:
+              arr = [random.randint(1, 100) for _ in range(50)]
+              engine = algo_cls()
+              list(engine.sort(arr))
+              if not is_sorted(arr):
+                  raise Exception(f'Algorithm {algo_cls.name} failed to sort correctly!')
+          print('All non-joke algorithms sorted correctly.')
+          "
+
+      - name: CLI List Gate
+        run: sortui --list
+
+      - name: CLI Version Gate
+        run: sortui --version
+
+      - name: CLI Benchmark Gate
+        run: sortui --benchmark bubble insertion --size 30 --seed 42
