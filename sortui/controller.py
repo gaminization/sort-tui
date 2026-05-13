@@ -72,7 +72,7 @@ class Controller:
         self.custom_array = list(custom_array) if custom_array is not None else None
         self.stability_mode = stability_mode
         self.replay_path = Path(replay_path) if replay_path is not None else None
-        self.audio_enabled = audio_enabled
+        self._audio_enabled = bool(audio_enabled) and is_available()
         self.audio_min_freq = audio_min_freq
         self.audio_max_freq = audio_max_freq
         self.compare_keys = [
@@ -116,13 +116,6 @@ class Controller:
         # Auto-size: one bar per column, leaving a 1-column margin on each side
         return max(10, cols - 2)
 
-    def _maybe_play_audio(self, frame: SortFrame) -> None:
-        if self.audio_enabled and frame.operation in ('swap', 'compare'):
-            if frame.highlighted and frame.array:
-                idx = frame.highlighted[0]
-                if 0 <= idx < len(frame.array):
-                    val = frame.array[idx]
-                    play_note(val, min(frame.array), max(frame.array))
 
     def _new_engine(self, cols: int, new_seed: bool = True) -> None:
         """Tear down the current engine and create a fresh one.
@@ -355,8 +348,8 @@ class Controller:
 
             # ── Toggle audio ──────────────────────────────────────────────
             elif key in (ord("m"), ord("M")):
-                self.audio_enabled = not self.audio_enabled
-                self._status_message = f"Audio {'on' if self.audio_enabled else 'off'}"
+                self._audio_enabled = not self._audio_enabled
+                self._status_message = f"Audio {'on' if self._audio_enabled else 'off'}"
 
             # ── Toggle side-by-side comparison ───────────────────────────
             elif key in (ord("c"), ord("C")) and self.replay_path is None:
@@ -404,7 +397,13 @@ class Controller:
                             self._compare_stats[idx].update(f)
                             self._compare_current_frames[idx] = f
                             self._compare_frame_nums[idx] += 1
-                            self._maybe_play_audio(f)
+                            if self._audio_enabled and hasattr(f, 'operation'):
+                                if f.operation in ('swap', 'compare', 'write'):
+                                    if f.highlighted and f.array:
+                                        idx = f.highlighted[0]
+                                        if 0 <= idx < len(f.array):
+                                            arr = f.array
+                                            play_note(arr[idx], min(arr), max(arr))
                     if self._compare_current_frames:
                         self._current_frame = self._compare_current_frames[0]
                         self._stats = self._compare_stats[0]
@@ -415,7 +414,13 @@ class Controller:
                         self._stats.update(f)
                         self._current_frame = f
                         self._frame_num += 1
-                        self._maybe_play_audio(f)
+                        if self._audio_enabled and hasattr(f, 'operation'):
+                            if f.operation in ('swap', 'compare', 'write'):
+                                if f.highlighted and f.array:
+                                    idx = f.highlighted[0]
+                                    if 0 <= idx < len(f.array):
+                                        arr = f.array
+                                        play_note(arr[idx], min(arr), max(arr))
                     # When the engine is exhausted we keep showing the last
                     # frame; no automatic pause so the user can still interact.
 
@@ -486,7 +491,7 @@ class Controller:
                 stability_status=stability_status,
                 status_message=self._status_message,
                 recommended=self._recommended,
-                audio_enabled=self.audio_enabled,
+                audio_enabled=self._audio_enabled,
             )
             if self._show_help:
                 self._renderer.draw_help_overlay(stdscr)
