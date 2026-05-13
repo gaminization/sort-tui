@@ -8,6 +8,11 @@ from typing import Optional
 from sortui import __version__
 from sortui.input_generator import InputDistribution
 
+MIN_SIZE = 2
+MAX_VISUAL_SIZE = 5000
+MAX_SPEED = 100.0
+MAX_BENCHMARK_SIZE = 100_000
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -134,6 +139,13 @@ Examples:
         help="Run benchmark mode for one or more algorithms and exit",
     )
     parser.add_argument(
+        "--benchmark-size",
+        type=int,
+        default=None,
+        metavar="INT",
+        help="Number of elements for benchmark and complexity-plot modes",
+    )
+    parser.add_argument(
         "--benchmark-export",
         default=None,
         metavar="PATH",
@@ -144,6 +156,20 @@ Examples:
         action="store_true",
         default=False,
         help="Render an ASCII/braille growth curve after benchmark results",
+    )
+    parser.add_argument(
+        "--worst-case",
+        action="store_true",
+        default=False,
+        help="Use the selected algorithm's worst-case input distribution",
+    )
+    parser.add_argument(
+        "--export",
+        nargs="?",
+        const="",
+        default=None,
+        metavar="PATH",
+        help="Run once, export frames to JSON, and exit (default: ~/sortui_run_<timestamp>.json)",
     )
     parser.add_argument(
         "--replay",
@@ -162,6 +188,12 @@ Examples:
         action="store_true",
         default=False,
         help="Run a challenge mode attempt and exit",
+    )
+    parser.add_argument(
+        "--recommend",
+        action="store_true",
+        default=False,
+        help="Print a recommendation for the selected/generated input and exit",
     )
     parser.add_argument(
         "--list",
@@ -186,6 +218,36 @@ def _resolve(cli_val, profile_val, config_val, default):
     return default
 
 
+def _normalize_key(value: str) -> str:
+    return value.lower().replace(" ", "_").replace("-", "_")
+
+
+def _validate_size(parser: argparse.ArgumentParser, value, flag: str, *, maximum: int) -> int | None:
+    if value is None:
+        return None
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        parser.error(f"{flag} must be an integer.")
+    if parsed < MIN_SIZE:
+        parser.error(f"{flag} must be at least {MIN_SIZE}.")
+    if parsed > maximum:
+        parser.error(f"{flag} must be at most {maximum}.")
+    return parsed
+
+
+def _parse_custom_input(parser: argparse.ArgumentParser, raw: str | None) -> list[int] | None:
+    if raw is None:
+        return None
+    try:
+        values = [int(part.strip()) for part in raw.split(",") if part.strip()]
+    except ValueError:
+        parser.error("--input must be a comma-separated list of integers.")
+    if len(values) < MIN_SIZE:
+        parser.error(f"--input must contain at least {MIN_SIZE} values.")
+    return values
+
+
 def main() -> None:
     from pathlib import Path
 
@@ -194,7 +256,14 @@ def main() -> None:
     from sortui.challenge import challenge_menu, run_challenge
     from sortui.config import SortuiConfig
     from sortui.controller import Controller
+    from sortui.export import default_export_path, export_run
+    from sortui.input_generator import generate_array
     from sortui.plugin_loader import register_plugins
+    from sortui.recommendation import recommendation_text
+    from sortui.stability import tag_duplicates
+    from sortui.stats import SortStats
+    from sortui.time_travel import TimeTravelEngine
+    from sortui.audio import is_available
 
     parser = build_parser()
     args = parser.parse_args()
@@ -236,7 +305,7 @@ def main() -> None:
     )
 
     # Normalise key (spaces/hyphens → underscores, lower-case)
-    algorithm_key = algorithm_key.lower().replace(" ", "_").replace("-", "_")
+    algorithm_key = _normalize_key(algorithm_key)
 
     raw_speed = _resolve(
         args.speed,
@@ -248,9 +317,10 @@ def main() -> None:
         speed = float(raw_speed)
         if speed <= 0:
             raise ValueError("speed must be positive")
+        if speed > MAX_SPEED:
+            raise ValueError(f"speed must be <= {MAX_SPEED:g}")
     except (TypeError, ValueError) as exc:
-        print(f"Error: invalid --speed value {raw_speed!r}: {exc}", file=sys.stderr)
-        sys.exit(1)
+        parser.error(f"invalid --speed value {raw_speed!r}: {exc}")
 
     order: str = _resolve(
         args.order,
@@ -258,13 +328,24 @@ def main() -> None:
         cfg.order,
         "asc",
     )
+    if str(order).lower() not in {"asc", "desc"}:
+        parser.error("--order must be one of: asc, desc.")
     ascending: bool = order.lower() == "asc"
 
     # --size: int or None (None → auto-detect from terminal width at runtime)
-    size: Optional[int] = args.size
-    if size is not None and size < 2:
-        print("Error: --size must be at least 2.", file=sys.stderr)
-        sys.exit(1)
+    size: Optional[int] = _validate_size(
+        parser,
+        _resolve(args.size, profile_overrides.get("size"), None, None),
+        "--size",
+        maximum=MAX_VISUAL_SIZE,
+    )
+
+    benchmark_size = _validate_size(
+        parser,
+        args.benchmark_size if args.benchmark_size is not None else None,
+        "--benchmark-size",
+        maximum=MAX_BENCHMARK_SIZE,
+    )
 
     seed: Optional[int] = args.seed if args.seed is not None else cfg.seed
 
@@ -274,6 +355,13 @@ def main() -> None:
         cfg.distribution,
         "random",
     )
+    if args.worst_case:
+        distribution = InputDistribution.WORST_CASE.value
+    distribution = str(distribution).lower().replace("-", "_").replace(" ", "_")
+    if distribution not in InputDistribution.choices():
+        parser.error(
+            f"--distribution must be one of: {', '.join(InputDistribution.choices())}."
+        )
 
     vis_mode: str = _resolve(
         args.mode,
@@ -281,6 +369,9 @@ def main() -> None:
         cfg.visualization_mode,
         "bars",
     )
+    valid_modes = {"bars", "dots", "horizontal", "numbers", "waveform", "spiral", "circular"}
+    if vis_mode not in valid_modes:
+        parser.error(f"--mode must be one of: {', '.join(sorted(valid_modes))}.")
     audio_enabled: bool = bool(
         _resolve(
             args.audio,
@@ -296,14 +387,78 @@ def main() -> None:
         _resolve(None, profile_overrides.get("audio_max_freq"), cfg.audio_max_freq, 1200)
     )
 
+    if audio_enabled:
+        if not is_available():
+            print(
+                "[sortui] Audio requested but /dev/audio and ossaudiodev are unavailable.\n"
+                "Animation will continue without sound.",
+                file=sys.stderr,
+            )
+            audio_enabled = False
+
+    # ── Validate algorithm ─────────────────────────────────────────────────
+    if algorithm_key not in ALGORITHMS:
+        available = ", ".join(sorted(ALGORITHMS.keys()))
+        print(
+            f"Error: unknown algorithm {algorithm_key!r}.\n"
+            f"Available: {available}\n"
+            f"Run `sortui --list` for a full listing.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    # ── Parse --input (custom array) ───────────────────────────────────────
+    custom_array = _parse_custom_input(parser, args.input)
+    if custom_array is not None:
+        # Override size; distribution is irrelevant for a custom array
+        size = len(custom_array)
+
+    def build_array() -> list[int]:
+        algorithm = ALGORITHMS[algorithm_key]()
+        requested_size = size if size is not None else MIN_SIZE * 25
+        if custom_array is not None:
+            return list(custom_array)
+        return generate_array(requested_size, distribution, seed=seed, algorithm=algorithm)
+
+    # ── Recommendation mode ────────────────────────────────────────────────
+    if args.recommend:
+        print(recommendation_text(build_array()))
+        sys.exit(0)
+
+    # ── Export mode ────────────────────────────────────────────────────────
+    if args.export is not None:
+        algorithm = ALGORITHMS[algorithm_key]()
+        setattr(algorithm, "key", algorithm_key)
+        array = build_array()
+        if args.stability:
+            array = tag_duplicates(array)  # type: ignore[assignment]
+        engine = TimeTravelEngine(algorithm, array, ascending)
+        stats = SortStats()
+        while True:
+            frame = engine.advance()
+            if frame is None:
+                break
+            stats.update(frame)
+        export_path = default_export_path() if args.export == "" else Path(args.export)
+        path = export_run(engine, algorithm, stats, export_path)
+        print(f"Exported {path}")
+        sys.exit(0)
+
     # ── Benchmark mode ────────────────────────────────────────────────────
     if args.benchmark is not None:
-        benchmark_algorithms = args.benchmark or [algorithm_key]
-        benchmark_size = args.size or cfg.benchmark_size
+        benchmark_algorithms = [_normalize_key(key) for key in (args.benchmark or [algorithm_key])]
+        unknown = [key for key in benchmark_algorithms if key not in ALGORITHMS]
+        if unknown:
+            print(
+                f"Error: unknown benchmark algorithm(s): {', '.join(unknown)}.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        resolved_benchmark_size = benchmark_size or size or cfg.benchmark_size
         try:
             results = run_benchmark(
                 benchmark_algorithms,
-                size=benchmark_size,
+                size=resolved_benchmark_size,
                 seed=seed,
                 iterations=cfg.benchmark_iterations,
                 distribution=distribution,
@@ -320,22 +475,16 @@ def main() -> None:
         print(render_leaderboard(results))
         if args.complexity_plot:
             print()
-            print(complexity_plot(benchmark_algorithms[0], max_size=benchmark_size, seed=seed))
+            print(complexity_plot(benchmark_algorithms[0], max_size=resolved_benchmark_size, seed=seed))
         sys.exit(0)
 
-    # ── Validate algorithm ─────────────────────────────────────────────────
-    if algorithm_key not in ALGORITHMS:
-        available = ", ".join(sorted(ALGORITHMS.keys()))
-        print(
-            f"Error: unknown algorithm {algorithm_key!r}.\n"
-            f"Available: {available}\n"
-            f"Run `sortui --list` for a full listing.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
+    if args.complexity_plot:
+        resolved_benchmark_size = benchmark_size or size or cfg.benchmark_size
+        print(complexity_plot(algorithm_key, max_size=resolved_benchmark_size, seed=seed))
+        sys.exit(0)
 
     if args.compare:
-        compare_keys = [key.lower().replace(" ", "_").replace("-", "_") for key in args.compare]
+        compare_keys = [_normalize_key(key) for key in args.compare]
         if not (2 <= len(compare_keys) <= 3):
             print("Error: --compare expects 2 or 3 algorithms.", file=sys.stderr)
             sys.exit(1)
@@ -359,20 +508,6 @@ def main() -> None:
             f"{result['swaps']} swaps"
         )
         sys.exit(0)
-
-    # ── Parse --input (custom array) ───────────────────────────────────────
-    custom_array: Optional[list[int]] = None
-    if args.input:
-        try:
-            custom_array = [int(x.strip()) for x in args.input.split(",") if x.strip()]
-        except ValueError as exc:
-            print(f"Error parsing --input: {exc}", file=sys.stderr)
-            sys.exit(1)
-        if len(custom_array) < 2:
-            print("Error: --input must contain at least 2 values.", file=sys.stderr)
-            sys.exit(1)
-        # Override size; distribution is irrelevant for a custom array
-        size = len(custom_array)
 
     # ── Build controller ───────────────────────────────────────────────────
     controller = Controller(
@@ -402,7 +537,11 @@ def main() -> None:
     try:
         curses.wrapper(controller.run)
     except KeyboardInterrupt:
-        pass  # clean Ctrl-C exit — no traceback
+        try:
+            curses.endwin()
+        except curses.error:
+            pass
+        sys.exit(0)  # clean Ctrl-C exit — no traceback
     except Exception as exc:
         # Surface unexpected crashes outside the curses context so the
         # terminal is restored before printing the error.
