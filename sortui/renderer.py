@@ -4,6 +4,7 @@ import curses
 
 from sortui.algorithms.base import SortAlgorithm, SortFrame
 from sortui.stats import SortStats
+from sortui.audio import backend_name as _audio_backend
 
 # ── Color pair constants ───────────────────────────────────────────────────────
 PAIR_DEFAULT = 1  # white  — normal bar
@@ -418,7 +419,7 @@ class Renderer:
         ctrl_str = (
             " [SPC] Pause  [→] Step  [←] Back  [R] Reset  [Q] Quit  [+/-] Speed  [V] View  [S] Stable  [M] Audio  [E] Export  [?] Help"
         )
-        audio_str = "[audio: ON]" if audio_enabled else "[audio: OFF]"
+        audio_str = f"[♪ {_audio_backend()}]" if _audio_backend() and audio_enabled else "[♪ off]"
         
         # Draw controls on the left, audio on the right
         _safe_addstr(

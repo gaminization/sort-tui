@@ -1,115 +1,255 @@
+"""
+sortui.audio — pitch-mapped tones via ALSA ctypes.
+
+Backend: ALSA libasound.so.2 via ctypes (confirmed working on this machine).
+Fallbacks: ossaudiodev, /dev/audio.
+Degrades silently if nothing works.
+Rate-limited to one tone per 50ms.
+"""
+
+from __future__ import annotations
+import ctypes
+import ctypes.util
 import math
 import os
 import struct
 import threading
 import time
+from typing import Optional
 
-def generate_tone(frequency: float, duration: float = 0.04,
-                  sample_rate: int = 44100, volume: float = 0.3) -> bytes:
-    n_samples = int(sample_rate * duration)
-    samples = []
-    for i in range(n_samples):
-        t = i / sample_rate
-        val = int(volume * 32767 * math.sin(2 * math.pi * frequency * t))
-        val = max(-32768, min(32767, val))
-        samples.append(struct.pack('<h', val))
-    return b''.join(samples)
 
-def value_to_frequency(value: int, min_val: int, max_val: int) -> float:
-    # Map value range to 200Hz-2000Hz (audible, not annoying)
-    if max_val == min_val:
+# ---------------------------------------------------------------------------
+# Tone generation — pure Python, no numpy
+# ---------------------------------------------------------------------------
+
+def generate_tone(
+    frequency: float,
+    duration: float = 0.06,
+    sample_rate: int = 44100,
+    volume: float = 0.3,
+) -> bytes:
+    """Return signed 16-bit little-endian PCM for a sine tone."""
+    n = int(sample_rate * duration)
+    tau = 2.0 * math.pi * frequency / sample_rate
+    return b"".join(
+        struct.pack("<h", max(-32768, min(32767,
+            int(volume * 32767 * math.sin(tau * i)))))
+        for i in range(n)
+    )
+
+
+def value_to_frequency(value: int, lo: int, hi: int) -> float:
+    """Map value linearly to 200–2000 Hz."""
+    if hi == lo:
         return 440.0
-    ratio = (value - min_val) / (max_val - min_val)
-    return 200.0 + ratio * 1800.0
+    return 200.0 + (value - lo) / (hi - lo) * 1800.0
 
-class AudioPlayer:
-    def __init__(self):
-        self._available = self._check_available()
-        self._last_play = 0.0
 
-    def _check_available(self) -> bool:
-        try:
-            import ossaudiodev
-            return True
-        except ImportError:
-            pass
-        try:
-            return os.path.exists('/dev/audio')
-        except Exception:
+# ---------------------------------------------------------------------------
+# ALSA backend via ctypes
+# ---------------------------------------------------------------------------
+
+def _try_alsa(pcm16: bytes, device: bytes = b"default") -> bool:
+    """Write PCM16 to ALSA. Returns True on success."""
+    try:
+        lib = ctypes.util.find_library("asound")
+        if not lib:
+            return False
+        alsa = ctypes.CDLL(lib)
+
+        SND_PCM_STREAM_PLAYBACK   = 0
+        SND_PCM_FORMAT_S16_LE     = 2
+        SND_PCM_ACCESS_RW_INTERLEAVED = 3
+
+        pcm_p = ctypes.c_void_p()
+        if alsa.snd_pcm_open(
+            ctypes.byref(pcm_p), device, SND_PCM_STREAM_PLAYBACK, 0
+        ) != 0:
             return False
 
-    def play(self, value: int, min_val: int, max_val: int) -> None:
-        """Play a short tone for the given value. Non-blocking. Never raises."""
-        if not self._available:
+        alsa.snd_pcm_set_params(
+            pcm_p,
+            SND_PCM_FORMAT_S16_LE,
+            SND_PCM_ACCESS_RW_INTERLEAVED,
+            ctypes.c_uint(1),        # mono
+            ctypes.c_uint(44100),    # sample rate
+            ctypes.c_int(1),         # soft resample allowed
+            ctypes.c_uint(100_000),  # latency: 100ms in µs
+        )
+
+        n_frames = len(pcm16) // 2
+        buf = ctypes.create_string_buffer(pcm16)
+        alsa.snd_pcm_writei(pcm_p, buf, ctypes.c_ulong(n_frames))
+        alsa.snd_pcm_drain(pcm_p)
+        alsa.snd_pcm_close(pcm_p)
+        return True
+    except Exception:
+        return False
+
+
+# ---------------------------------------------------------------------------
+# OSS fallback
+# ---------------------------------------------------------------------------
+
+def _try_oss(pcm16: bytes) -> bool:
+    try:
+        import ossaudiodev  # type: ignore[import]
+        dsp = ossaudiodev.open("w")
+        dsp.setparameters(ossaudiodev.AFMT_S16_LE, 1, 44100, True)
+        dsp.write(pcm16)
+        dsp.flush()
+        dsp.close()
+        return True
+    except Exception:
+        return False
+
+
+# ---------------------------------------------------------------------------
+# /dev/audio fallback (mu-law)
+# ---------------------------------------------------------------------------
+
+def _pcm16_to_mulaw(pcm16: bytes) -> bytes:
+    BIAS = 33
+    out = []
+    for i in range(0, len(pcm16) - 1, 2):
+        s = struct.unpack_from("<h", pcm16, i)[0]
+        sign = 0x80 if s < 0 else 0
+        s = min(abs(s) + BIAS, 32767)
+        exp = 7
+        for exp in range(7, 0, -1):
+            if s >= (1 << (exp + 3)):
+                break
+        mantissa = (s >> (exp + 3)) & 0x0F
+        out.append((~(sign | (exp << 4) | mantissa)) & 0xFF)
+    return bytes(out)
+
+
+def _try_dev_audio(pcm16: bytes) -> bool:
+    try:
+        with open("/dev/audio", "wb") as f:
+            f.write(_pcm16_to_mulaw(pcm16))
+        return True
+    except Exception:
+        return False
+
+
+# ---------------------------------------------------------------------------
+# AudioPlayer
+# ---------------------------------------------------------------------------
+
+class AudioPlayer:
+    """Thread-safe, rate-limited, auto-detecting audio player."""
+
+    # ALSA devices to try in order — default works on this machine
+    _ALSA_DEVICES = [b"default", b"pulse", b"pipewire", b"plughw:0,0"]
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._available: Optional[bool] = None
+        self._backend: Optional[str] = None
+        self._alsa_device: bytes = b"default"
+        self._last_play: float = 0.0
+
+    def _detect(self) -> Optional[str]:
+        """Try each backend and return the first working one."""
+        # ALSA
+        try:
+            lib = ctypes.util.find_library("asound")
+            if lib:
+                alsa = ctypes.CDLL(lib)
+                pcm = ctypes.c_void_p()
+                for dev in self._ALSA_DEVICES:
+                    ret = alsa.snd_pcm_open(
+                        ctypes.byref(pcm), dev, 0, 0
+                    )
+                    if ret == 0:
+                        alsa.snd_pcm_close(pcm)
+                        self._alsa_device = dev
+                        return "alsa"
+        except Exception:
+            pass
+
+        # OSS
+        try:
+            import ossaudiodev as _oss  # type: ignore[import]
+            dsp = _oss.open("w")
+            dsp.close()
+            return "oss"
+        except Exception:
+            pass
+
+        # /dev/audio
+        if os.path.exists("/dev/audio"):
+            return "dev_audio"
+
+        return None
+
+    @property
+    def available(self) -> bool:
+        if self._available is None:
+            self._backend = self._detect()
+            self._available = self._backend is not None
+        return self._available
+
+    def play(self, value: int, lo: int, hi: int) -> None:
+        """Non-blocking pitch-mapped tone. Never raises."""
+        if not self.available:
             return
         now = time.monotonic()
-        if now - self._last_play < 0.05:
-            return
-        self._last_play = now
-        freq = value_to_frequency(value, min_val, max_val)
+        with self._lock:
+            if now - self._last_play < 0.05:
+                return
+            self._last_play = now
+        freq = value_to_frequency(value, lo, hi)
         threading.Thread(
-            target=self._play_tone,
-            args=(freq,),
-            daemon=True
+            target=self._play_tone, args=(freq,), daemon=True
         ).start()
 
     def _play_tone(self, frequency: float) -> None:
         try:
             data = generate_tone(frequency)
-            self._write_audio(data)
-        except Exception:
-            pass  # never surface audio errors to the user
-
-    def _write_audio(self, data: bytes) -> None:
-        try:
-            import ossaudiodev
-            dsp = ossaudiodev.open('w')
-            try:
-                dsp.setparameters(ossaudiodev.AFMT_S16_LE, 1, 44100, True)
-                dsp.write(data)
-                dsp.flush()
-            finally:
-                dsp.close()
-            return
-        except Exception:
-            pass
-        try:
-            with open('/dev/audio', 'wb') as f:
-                f.write(self._to_mulaw(data))
+            if self._backend == "alsa":
+                if _try_alsa(data, self._alsa_device):
+                    return
+                # ALSA failed mid-session — try others
+                if _try_oss(data):
+                    self._backend = "oss"
+                    return
+            elif self._backend == "oss":
+                if _try_oss(data):
+                    return
+            _try_dev_audio(data)
         except Exception:
             pass
 
-    def _to_mulaw(self, pcm16: bytes) -> bytes:
-        """Convert 16-bit PCM to 8-bit mu-law for /dev/audio."""
-        import struct
-        MULAW_BIAS = 33
-        result = []
-        for i in range(0, len(pcm16) - 1, 2):
-            sample = struct.unpack_from('<h', pcm16, i)[0]
-            sign = 0 if sample >= 0 else 0x80
-            sample = abs(sample)
-            sample = min(sample + MULAW_BIAS, 32767)
-            exp = 7
-            for exp_val in range(7, 0, -1):
-                if sample >= (1 << (exp_val + 3)):
-                    exp = exp_val
-                    break
-            mantissa = (sample >> (exp + 3)) & 0x0F
-            result.append(~(sign | (exp << 4) | mantissa) & 0xFF)
-        return bytes(result)
 
-# Module-level singleton
-_player: AudioPlayer | None = None
+# ---------------------------------------------------------------------------
+# Module-level singleton + public API
+# ---------------------------------------------------------------------------
+
+_player: Optional[AudioPlayer] = None
+_init_lock = threading.Lock()
+
 
 def get_player() -> AudioPlayer:
     global _player
     if _player is None:
-        _player = AudioPlayer()
+        with _init_lock:
+            if _player is None:
+                _player = AudioPlayer()
     return _player
 
-def play_note(value: int, min_val: int, max_val: int) -> None:
-    """Called by controller on each swap/compare frame when audio enabled."""
-    get_player().play(value, min_val, max_val)
+
+def play_note(value: int, lo: int, hi: int) -> None:
+    """Called by controller on each swap/compare frame."""
+    get_player().play(value, lo, hi)
+
 
 def is_available() -> bool:
-    return get_player()._available
+    return get_player().available
+
+
+def backend_name() -> Optional[str]:
+    p = get_player()
+    _ = p.available  # trigger detection
+    return p._backend

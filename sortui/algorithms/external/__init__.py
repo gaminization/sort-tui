@@ -6,6 +6,7 @@ from typing import Any, Generator, List
 from sortui.algorithms._helpers import base_frame, done_frame, sorted_values, value_of
 from sortui.algorithms.base import SortAlgorithm, SortFrame
 from sortui.algorithms.common import keys_from, registry_from
+from sortui.algorithms.external.tape_merge import TapeMergeSort
 
 CATEGORY = "External Sorts"
 
@@ -602,6 +603,8 @@ _ITEMS = [
     ("cascade_merge", CascadeMergeSort),
     ("oscillating", OscillatingSort),
     ("replacement_selection", ReplacementSelectionSort),
+
+    ("tape_merge", TapeMergeSort),
 ]
 
 CATEGORY_ALGORITHMS = registry_from(_ITEMS)

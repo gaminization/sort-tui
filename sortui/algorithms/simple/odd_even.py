@@ -7,6 +7,12 @@ from sortui.algorithms._helpers import value_of
 from sortui.algorithms.base import SortAlgorithm, SortFrame
 
 
+
+def _base_frame(arr, **kwargs):
+    kwargs.setdefault('explanation', 'Sorting step')
+    kwargs.setdefault('operation', 'compare')
+    return base_frame(arr, **kwargs)
+
 class OddEvenSort(SortAlgorithm):
     name = "Odd-Even Sort"
     category = "Simple Sorts"

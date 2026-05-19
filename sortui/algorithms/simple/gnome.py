@@ -5,6 +5,12 @@ from typing import Generator, List
 from sortui.algorithms.base import SortAlgorithm, SortFrame
 
 
+
+def _base_frame(arr, **kwargs):
+    kwargs.setdefault('explanation', 'Sorting step')
+    kwargs.setdefault('operation', 'compare')
+    return base_frame(arr, **kwargs)
+
 class GnomeSort(SortAlgorithm):
     name = "Gnome Sort"
     category = "Simple Sorts"

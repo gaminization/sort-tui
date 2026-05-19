@@ -25,6 +25,17 @@ from sortui.algorithms.simple import (
     OddEvenSort,
     SelectionSort,
     StrandSort,
+    TwoWayBubbleSort,
+    OptimizedBubbleSort,
+    DutchNationalFlagSort,
+    GravitySortSimulation,
+    CircleSort,
+    SwapSort,
+    MaxSort,
+    BidirectionalSelectionSort,
+    SpaghettiSort,
+    LinkedListInsertionSort,
+    SplicedInsertionSort,
 )
 
 # Map of algorithm key (lowercase, underscored) -> class
@@ -38,6 +49,17 @@ ALGORITHMS: dict[str, Type[SortAlgorithm]] = {
     "exchange": ExchangeSort,
     "cycle": CycleSort,
     "strand": StrandSort,
+    "two_way_bubble": TwoWayBubbleSort,
+    "optimized_bubble": OptimizedBubbleSort,
+    "flag": DutchNationalFlagSort,
+    "gravity": GravitySortSimulation,
+    "circle": CircleSort,
+    "swap_sort": SwapSort,
+    "max_sort": MaxSort,
+    "bidirectional_selection": BidirectionalSelectionSort,
+    "spaghetti_real": SpaghettiSort,
+    "list_insertion": LinkedListInsertionSort,
+    "spliced_insertion": SplicedInsertionSort,
 }
 
 _CATEGORY_MODULES = [
@@ -70,6 +92,17 @@ CATEGORIES: dict[str, list[str]] = {
         "exchange",
         "cycle",
         "strand",
+        "two_way_bubble",
+        "optimized_bubble",
+        "flag",
+        "gravity",
+        "circle",
+        "swap_sort",
+        "max_sort",
+        "bidirectional_selection",
+        "spaghetti_real",
+        "list_insertion",
+        "spliced_insertion",
     ],
 }
 

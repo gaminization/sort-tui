@@ -37,102 +37,141 @@ In an educational visualization tool, the number of `yield` statements ("Frames"
 
 Below is the absolute frame count for each non-joke algorithm sorting the same `size=100` random array:
 
-| Algorithm | Frames | Category |
-|---|---|---|
-| Quantum Sort | 102 | Specialized / Joke Sorts |
-| Parallel Bubble Sort | 169 | Parallel Sorts |
-| Twin Heapsort | 201 | Hybrid Variants |
-| Parallel Merge Sort | 203 | Parallel Sorts |
-| Proxmap Sort | 227 | Numerical Sorts |
-| Shear Sort | 241 | Parallel Sorts |
-| AKS Network Sort | 262 | Parallel Sorts |
-| Cartesian Tree Sort | 293 | Adaptive Sorts |
-| External Merge Sort | 297 | External Sorts |
-| Sample Sort | 302 | Parallel Sorts |
-| Ternary Search Tree Sort | 401 | String-Specific Sorts |
-| Replacement Selection | 404 | External Sorts |
-| Burstsort | 418 | Non-Comparison Sorts |
-| Three-Way Merge Sort | 431 | Specialized / Joke Sorts |
-| Polyphase Merge Sort | 441 | External Sorts |
-| Radix MSD Sort | 517 | Non-Comparison Sorts |
-| Cascade Merge Sort | 533 | External Sorts |
-| Radix LSD Sort | 601 | Non-Comparison Sorts |
-| Parallel Radix Sort | 604 | Parallel Sorts |
-| MSD String Sort | 624 | String-Specific Sorts |
-| Postman Sort | 635 | Non-Comparison Sorts |
-| Library Sort | 725 | Efficient Sorts |
-| Kirkpatrick-Reisch Sort | 753 | Numerical Sorts |
-| Flashsort | 756 | Non-Comparison Sorts |
-| Tree Sort | 797 | Efficient Sorts |
-| Columnsort | 801 | Parallel Sorts |
-| Quick-Heapsort | 823 | Hybrid Variants |
-| Bucket Sort | 885 | Non-Comparison Sorts |
-| Spreadsort | 886 | Non-Comparison Sorts |
-| American Flag Sort | 887 | String-Specific Sorts |
-| Block Quicksort | 895 | Adaptive Sorts |
-| In-place Radix Sort | 914 | Numerical Sorts |
-| External Distribution Sort | 922 | External Sorts |
-| Patience Sort | 944 | Efficient Sorts |
-| Quicksort | 960 | Efficient Sorts |
-| Tournament Sort | 1,028 | Efficient Sorts |
-| Three-Way String Quicksort | 1,038 | String-Specific Sorts |
-| Recombinant Sort | 1,056 | Non-Comparison Sorts |
-| Cube Sort | 1,135 | Efficient Sorts |
-| Counting Sort | 1,186 | Non-Comparison Sorts |
-| Dual-Pivot Quicksort | 1,214 | Hybrid Sorts |
-| Merge Sort | 1,240 | Efficient Sorts |
-| Grailsort | 1,261 | Adaptive Sorts |
-| Pigeonhole Sort | 1,286 | Non-Comparison Sorts |
-| Bead Sort | 1,292 | Specialized / Joke Sorts |
-| Introsort | 1,317 | Hybrid Sorts |
-| Quick-Merge Sort | 1,327 | Hybrid Variants |
-| Pattern-Defeating Quicksort | 1,330 | Adaptive Sorts |
-| Crumsort | 1,348 | Hybrid Sorts |
-| Oscillating Sort | 1,377 | External Sorts |
-| Ternary Heapsort | 1,404 | Hybrid Variants |
-| Splaysort | 1,437 | Adaptive Sorts |
-| Block Sort | 1,439 | Efficient Sorts |
-| Binary Quicksort | 1,541 | Numerical Sorts |
-| Fluxsort | 1,561 | Hybrid Sorts |
-| Comb Sort | 1,578 | Efficient Sorts |
-| van Emde Boas Sort | 1,599 | Other Sorts |
-| Heapsort | 1,616 | Efficient Sorts |
-| Adaptive Heapsort | 1,617 | Adaptive Sorts |
-| Bottom-Up Heapsort | 1,644 | Hybrid Variants |
-| Smoothsort | 1,716 | Efficient Sorts |
-| Weak Heapsort | 1,782 | Hybrid Variants |
-| Timsort | 1,851 | Hybrid Sorts |
-| Shell Sort | 1,890 | Efficient Sorts |
-| Strand Sort | 1,969 | Simple Sorts |
-| Odd-Even Sort | 2,083 | Simple Sorts |
-| Batcher's Sort | 2,084 | Parallel Sorts |
-| Bitonic Sort | 2,560 | Specialized / Joke Sorts |
-| Multistep Bitonic Sort | 2,564 | Parallel Sorts |
-| X + Y Sort | 2,603 | Other Sorts |
-| Adaptive Bitonic Sort | 2,659 | Adaptive Sorts |
-| In-place Merge Sort | 2,780 | Efficient Sorts |
-| Franceschini's Sort | 2,785 | Specialized / Joke Sorts |
-| Binary Insertion Sort | 2,857 | Hybrid Variants |
-| Adaptive Merge Sort | 3,854 | Adaptive Sorts |
-| Pairwise Network Sort | 4,420 | Parallel Sorts |
-| Insertion Sort | 4,761 | Simple Sorts |
-| Merge-Insertion Sort | 4,791 | Specialized / Joke Sorts |
-| Wiggle Sort | 4,902 | Adaptive Sorts |
-| Selection Sort | 5,051 | Simple Sorts |
-| Linear Sort | 5,362 | Specialized / Joke Sorts |
-| Cocktail Shaker Sort | 6,056 | Simple Sorts |
-| Cube Network Sort | 6,328 | Sorting Networks |
-| Brick Sort | 6,392 | Other Sorts |
-| Gnome Sort | 6,796 | Simple Sorts |
-| Bubble Sort | 6,908 | Simple Sorts |
-| Exchange Sort | 7,184 | Simple Sorts |
-| Sorting Network | 7,185 | Specialized / Joke Sorts |
-| Pancake Sort | 7,356 | Other Sorts |
-| Shuffle-Exchange Network | 8,391 | Sorting Networks |
-| Merge-Exchange Sort | 11,606 | Other Sorts |
-| Bitonic Merge Network | 11,695 | Sorting Networks |
-| Cycle Sort | 14,307 | Simple Sorts |
-| Topological Sort | 15,150 | Other Sorts |
+Algorithm | Frames | Category
+---|---|---
+Quantum Sort | 102 | Specialized / Joke Sorts
+Parallel Bubble Sort | 169 | Parallel Sorts
+Twin Heapsort | 201 | Hybrid Variants
+Binomial Heap Sort | 202 | CATEGORY
+Parallel Merge Sort | 203 | Parallel Sorts
+Fibonacci Heap Sort | 204 | CATEGORY
+Leftist Heap Sort | 205 | CATEGORY
+Pairing Heap Sort | 206 | CATEGORY
+Skew Heap Sort | 207 | CATEGORY
+Red-Black Tree Sort | 208 | CATEGORY
+Multi-way Merge Sort | 209 | CATEGORY
+Scapegoat Sort | 210 | CATEGORY
+Skip List Sort | 211 | CATEGORY
+Tango Tree Sort | 212 | CATEGORY
+Proxmap Sort | 227 | Numerical Sorts
+Shear Sort | 241 | Parallel Sorts
+AKS Network Sort | 262 | Parallel Sorts
+AVL Tree Sort | 263 | CATEGORY
+Cartesian Tree Sort | 293 | Adaptive Sorts
+External Merge Sort | 297 | External Sorts
+Sample Sort | 302 | Parallel Sorts
+Treap Sort | 358 | CATEGORY
+Ternary Search Tree Sort | 401 | String-Specific Sorts
+Replacement Selection | 404 | External Sorts
+Burstsort | 418 | Non-Comparison Sorts
+Three-Way Merge Sort | 431 | Specialized / Joke Sorts
+Polyphase Merge Sort | 441 | External Sorts
+Radix MSD Sort | 517 | Non-Comparison Sorts
+Cascade Merge Sort | 533 | External Sorts
+Hoare Partition Quicksort | 572 | CATEGORY
+Radix LSD Sort | 601 | Non-Comparison Sorts
+Parallel Radix Sort | 604 | Parallel Sorts
+MSD String Sort | 624 | String-Specific Sorts
+Postman Sort | 635 | Non-Comparison Sorts
+Ping-Pong Merge Sort | 652 | CATEGORY
+Library Sort | 725 | Efficient Sorts
+Strand Merge Sort | 743 | CATEGORY
+Tape Merge Sort | 752 | CATEGORY
+Kirkpatrick-Reisch Sort | 753 | Numerical Sorts
+Flashsort | 756 | Non-Comparison Sorts
+Tree Sort | 797 | Efficient Sorts
+Columnsort | 801 | Parallel Sorts
+Quick-Heapsort | 823 | Hybrid Variants
+Bucket Sort | 885 | Non-Comparison Sorts
+Spreadsort | 886 | Non-Comparison Sorts
+American Flag Sort | 887 | String-Specific Sorts
+Block Quicksort | 895 | Adaptive Sorts
+Iterative Quicksort | 896 | CATEGORY
+In-place Radix Sort | 914 | Numerical Sorts
+External Distribution Sort | 922 | External Sorts
+Median-of-3 Quicksort | 933 | CATEGORY
+Patience Sort | 944 | Efficient Sorts
+Ninther Quicksort | 946 | CATEGORY
+Quicksort | 960 | Efficient Sorts
+Tournament Sort | 1,028 | Efficient Sorts
+Three-Way String Quicksort | 1,038 | String-Specific Sorts
+Recombinant Sort | 1,056 | Non-Comparison Sorts
+Randomized Quicksort | 1,111 | CATEGORY
+Median-of-5 Quicksort | 1,118 | CATEGORY
+Cube Sort | 1,135 | Efficient Sorts
+Counting Sort | 1,186 | Non-Comparison Sorts
+Dual-Pivot Quicksort | 1,214 | Hybrid Sorts
+Fat Partition Quicksort | 1,215 | CATEGORY
+Merge Sort | 1,240 | Efficient Sorts
+Iterative Merge Sort | 1,253 | CATEGORY
+Tiled Merge Sort | 1,259 | CATEGORY
+Grailsort | 1,261 | Adaptive Sorts
+Block Merge Sort | 1,271 | CATEGORY
+Pigeonhole Sort | 1,286 | Non-Comparison Sorts
+Bead Sort | 1,292 | Specialized / Joke Sorts
+Three-Way Quicksort | 1,301 | CATEGORY
+Introsort | 1,317 | Hybrid Sorts
+Quick-Merge Sort | 1,327 | Hybrid Variants
+Pattern-Defeating Quicksort | 1,330 | Adaptive Sorts
+Crumsort | 1,348 | Hybrid Sorts
+Oscillating Sort | 1,377 | External Sorts
+Ternary Heapsort | 1,404 | Hybrid Variants
+Splaysort | 1,437 | Adaptive Sorts
+Block Sort | 1,439 | Efficient Sorts
+D-ary Heap Sort | 1,462 | CATEGORY
+Binary Quicksort | 1,541 | Numerical Sorts
+Fluxsort | 1,561 | Hybrid Sorts
+Comb Sort | 1,578 | Efficient Sorts
+van Emde Boas Sort | 1,599 | Other Sorts
+Heapsort | 1,616 | Efficient Sorts
+Adaptive Heapsort | 1,617 | Adaptive Sorts
+Bottom-Up Heapsort | 1,644 | Hybrid Variants
+Smoothsort | 1,716 | Efficient Sorts
+Weak Heapsort | 1,782 | Hybrid Variants
+Timsort | 1,851 | Hybrid Sorts
+Natural Merge Sort | 1,882 | CATEGORY
+Shell Sort | 1,890 | Efficient Sorts
+Strand Sort | 1,969 | Simple Sorts
+Gravity Sort | 1,983 | Simple Sorts
+Dutch National Flag Sort | 2,009 | Simple Sorts
+Odd-Even Sort | 2,083 | Simple Sorts
+Batcher's Sort | 2,084 | Parallel Sorts
+Bitonic Sort | 2,560 | Specialized / Joke Sorts
+Multistep Bitonic Sort | 2,564 | Parallel Sorts
+Bidirectional Selection Sort | 2,598 | Simple Sorts
+X + Y Sort | 2,603 | Other Sorts
+Adaptive Bitonic Sort | 2,659 | Adaptive Sorts
+In-place Merge Sort | 2,780 | Efficient Sorts
+Franceschini's Sort | 2,785 | Specialized / Joke Sorts
+Binary Insertion Sort | 2,857 | Hybrid Variants
+Circle Sort | 2,972 | Simple Sorts
+Linked List Insertion Sort | 3,013 | Simple Sorts
+Adaptive Merge Sort | 3,854 | Adaptive Sorts
+Pairwise Network Sort | 4,420 | Parallel Sorts
+Insertion Sort | 4,761 | Simple Sorts
+Merge-Insertion Sort | 4,791 | Specialized / Joke Sorts
+Spliced Insertion Sort | 4,860 | Simple Sorts
+Wiggle Sort | 4,902 | Adaptive Sorts
+Max Sort | 5,048 | Simple Sorts
+Selection Sort | 5,051 | Simple Sorts
+Spaghetti Sort (Simulation) | 5,151 | Simple Sorts
+Linear Sort | 5,362 | Specialized / Joke Sorts
+Cocktail Shaker Sort | 6,056 | Simple Sorts
+Two-Way Bubble Sort | 6,057 | Simple Sorts
+Cube Network Sort | 6,328 | Sorting Networks
+Brick Sort | 6,392 | Other Sorts
+Gnome Sort | 6,796 | Simple Sorts
+Optimized Bubble Sort | 6,850 | Simple Sorts
+Bubble Sort | 6,908 | Simple Sorts
+Exchange Sort | 7,184 | Simple Sorts
+Sorting Network | 7,185 | Specialized / Joke Sorts
+Pancake Sort | 7,356 | Other Sorts
+Shuffle-Exchange Network | 8,391 | Sorting Networks
+Merge-Exchange Sort | 11,606 | Other Sorts
+Bitonic Merge Network | 11,695 | Sorting Networks
+Cycle Sort | 14,307 | Simple Sorts
+Topological Sort | 15,150 | Other Sorts
+Swap Sort | 19,599 | Simple Sorts
 
 ## TimSort Adaptation Ratio
 

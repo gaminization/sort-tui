@@ -19,6 +19,18 @@ from sortui.algorithms._helpers import (
 )
 from sortui.algorithms.base import SortAlgorithm, SortFrame
 from sortui.algorithms.common import keys_from, registry_from
+from sortui.algorithms.efficient.natural_merge import NaturalMergeSort
+from sortui.algorithms.efficient.strand_merge import StrandMergeSort
+from sortui.algorithms.efficient.tiled_merge import TiledMergeSort
+from sortui.algorithms.efficient.iterative_merge import IterativeMergeSort
+from sortui.algorithms.efficient.multi_merge import MultiWayMergeSort
+from sortui.algorithms.efficient.ping_pong_merge import PingPongMergeSort
+from sortui.algorithms.efficient.block_merge import BlockMergeSort
+from sortui.algorithms.efficient.avl_tree_sort import AVLTreeSort
+from sortui.algorithms.efficient.red_black_tree_sort import RedBlackTreeSort
+from sortui.algorithms.efficient.treap_sort import TreapSort
+from sortui.algorithms.efficient.skip_list_sort import SkipListSort
+from sortui.algorithms.efficient.tango_tree_sort import TangoTreeSort
 
 CATEGORY = "Efficient Sorts"
 
@@ -710,6 +722,19 @@ _ITEMS = [
     ("patience", PatienceSort),
     ("cube_sort", CubeSort),
     ("library_sort", LibrarySort),
+
+    ("natural_merge", NaturalMergeSort),
+    ("strand_merge", StrandMergeSort),
+    ("tiled_merge", TiledMergeSort),
+    ("iterative_merge", IterativeMergeSort),
+    ("multi_merge", MultiWayMergeSort),
+    ("ping_pong_merge", PingPongMergeSort),
+    ("block_merge", BlockMergeSort),
+    ("avl_tree_sort", AVLTreeSort),
+    ("red_black_tree_sort", RedBlackTreeSort),
+    ("treap_sort", TreapSort),
+    ("skip_list_sort", SkipListSort),
+    ("tango_tree_sort", TangoTreeSort),
 ]
 
 CATEGORY_ALGORITHMS = registry_from(_ITEMS)

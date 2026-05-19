@@ -18,6 +18,7 @@ from sortui.algorithms._helpers import (
 )
 from sortui.algorithms.base import SortAlgorithm, SortFrame
 from sortui.algorithms.common import keys_from, registry_from
+from sortui.algorithms.adaptive.scapegoat_sort import ScapegoatSort
 
 CATEGORY = "Adaptive Sorts"
 
@@ -663,6 +664,8 @@ _ITEMS = [
     ("block_quicksort", BlockQuickSort),
     ("pdqsort", PDQSort),
     ("grailsort", GrailSort),
+
+    ("scapegoat_sort", ScapegoatSort),
 ]
 
 CATEGORY_ALGORITHMS = registry_from(_ITEMS)

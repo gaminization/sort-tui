@@ -15,6 +15,12 @@ from sortui.algorithms._helpers import (
 )
 from sortui.algorithms.base import SortAlgorithm, SortFrame
 from sortui.algorithms.common import keys_from, registry_from
+from sortui.algorithms.hybrid_variants.d_ary_heap import DAryHeapSort
+from sortui.algorithms.hybrid_variants.pairing_heap import PairingHeapSort
+from sortui.algorithms.hybrid_variants.skew_heap import SkewHeapSort
+from sortui.algorithms.hybrid_variants.leftist_heap import LeftistHeapSort
+from sortui.algorithms.hybrid_variants.binomial_heap import BinomialHeapSort
+from sortui.algorithms.hybrid_variants.fibonacci_heap import FibonacciHeapSort
 
 CATEGORY = "Hybrid Variants"
 
@@ -567,6 +573,13 @@ _ITEMS = [
     ("quick_merge_sort", QuickMergeSort),
     ("binary_insertion", BinaryInsertionSort),
     ("quick_heapsort", QuickHeapSort),
+
+    ("d_ary_heap", DAryHeapSort),
+    ("pairing_heap", PairingHeapSort),
+    ("skew_heap", SkewHeapSort),
+    ("leftist_heap", LeftistHeapSort),
+    ("binomial_heap", BinomialHeapSort),
+    ("fibonacci_heap", FibonacciHeapSort),
 ]
 
 CATEGORY_ALGORITHMS = registry_from(_ITEMS)

@@ -390,8 +390,7 @@ def main() -> None:
     if audio_enabled:
         if not is_available():
             print(
-                "[sortui] Audio requested but /dev/audio and ossaudiodev are unavailable.\n"
-                "Animation will continue without sound.",
+                "[sortui] Audio unavailable: no working ALSA/OSS device found.",
                 file=sys.stderr,
             )
             audio_enabled = False

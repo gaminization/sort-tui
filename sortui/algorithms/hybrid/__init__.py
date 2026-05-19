@@ -18,6 +18,22 @@ from sortui.algorithms._helpers import (
 )
 from sortui.algorithms.base import SortAlgorithm, SortFrame
 from sortui.algorithms.common import keys_from, registry_from
+from .randomized_quicksort import RandomizedQuicksort
+from .median_of_3_quicksort import MedianOf3Quicksort
+from .median_of_5_quicksort import MedianOf5Quicksort
+from .fat_partition_quicksort import FatPartitionQuicksort
+from .three_way_quicksort import ThreeWayQuicksort
+from .hoare_quicksort import HoareQuicksort
+from .ninther_quicksort import NintherQuicksort
+from .iterative_quicksort import IterativeQuicksort
+from .randomized_quicksort import RandomizedQuicksort
+from .median_of_3_quicksort import MedianOf3Quicksort
+from .median_of_5_quicksort import MedianOf5Quicksort
+from .fat_partition_quicksort import FatPartitionQuicksort
+from .three_way_quicksort import ThreeWayQuicksort
+from .hoare_quicksort import HoareQuicksort
+from .ninther_quicksort import NintherQuicksort
+from .iterative_quicksort import IterativeQuicksort
 
 CATEGORY = "Hybrid Sorts"
 
@@ -596,6 +612,22 @@ class Crumsort(SortAlgorithm):
 
 
 _ITEMS = [
+    ("randomized_quicksort", RandomizedQuicksort),
+    ("median_of_3_quicksort", MedianOf3Quicksort),
+    ("median_of_5_quicksort", MedianOf5Quicksort),
+    ("fat_partition_quicksort", FatPartitionQuicksort),
+    ("three_way_quicksort", ThreeWayQuicksort),
+    ("hoare_quicksort", HoareQuicksort),
+    ("ninther_quicksort", NintherQuicksort),
+    ("iterative_quicksort", IterativeQuicksort),
+    ("randomized_quicksort", RandomizedQuicksort),
+    ("median_of_3_quicksort", MedianOf3Quicksort),
+    ("median_of_5_quicksort", MedianOf5Quicksort),
+    ("fat_partition_quicksort", FatPartitionQuicksort),
+    ("three_way_quicksort", ThreeWayQuicksort),
+    ("hoare_quicksort", HoareQuicksort),
+    ("ninther_quicksort", NintherQuicksort),
+    ("iterative_quicksort", IterativeQuicksort),
     ("timsort", TimSort),
     ("introsort", IntroSort),
     ("fluxsort", FluxSort),
