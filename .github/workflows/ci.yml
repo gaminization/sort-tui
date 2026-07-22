@@ -36,17 +36,16 @@ jobs:
       - name: Algorithm Correctness Sweep
         run: |
           python3 -c "
-          from sortui.algorithms import CATEGORY_ALGORITHMS, JOKE_ALGORITHMS
+          from sortui.algorithms import ALGORITHMS, JOKE_ALGORITHMS
           import random
           
           def is_sorted(arr):
               return all(arr[i] <= arr[i+1] for i in range(len(arr)-1))
           
           all_algos = []
-          for cat, algos in CATEGORY_ALGORITHMS.items():
-              for key, algo_cls in algos.items():
-                  if key not in JOKE_ALGORITHMS:
-                      all_algos.append(algo_cls)
+          for key, algo_cls in ALGORITHMS.items():
+              if key not in JOKE_ALGORITHMS:
+                  all_algos.append(algo_cls)
           
           print(f'Checking {len(all_algos)} algorithms...')
           for algo_cls in all_algos:
