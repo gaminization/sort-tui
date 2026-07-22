@@ -4,10 +4,9 @@
 
 **A high-performance, purely terminal-based educational visualizer for 149 sorting algorithms.**
 
-[![Python Version](https://img.shields.io/pypi/pyversions/sortui?style=for-the-badge&logo=python&logoColor=white)](https://pypi.org/project/sortui/)
+[![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
-[![CI](https://img.shields.io/github/actions/workflow/status/yourusername/sortui/ci.yml?branch=main&style=for-the-badge&logo=github)](https://github.com/yourusername/sortui/actions)
-[![PyPI version](https://img.shields.io/pypi/v/sortui?style=for-the-badge&logo=pypi&logoColor=white)](https://pypi.org/project/sortui/)
+[![CI](https://img.shields.io/github/actions/workflow/status/gaminization/sort-tui/ci.yml?branch=main&style=for-the-badge&logo=github)](https://github.com/gaminization/sort-tui/actions)
 
 ![sort-tui Demo](docs/assets/demo.svg)
 
