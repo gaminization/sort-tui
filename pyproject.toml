@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sort-tui"
-version = "0.1.1"
+version = "0.1.2"
 description = "Terminal visualiser for sorting algorithms"
 readme = "README.md"
 license = {file = "LICENSE"}
