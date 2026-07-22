@@ -18,8 +18,8 @@ To set up a local development environment:
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/yourusername/sortui.git
-cd sortui
+git clone https://github.com/gaminization/sort-tui.git
+cd sort-tui
 
 # 2. Create and activate a virtual environment
 python3 -m venv .venv

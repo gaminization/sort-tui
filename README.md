@@ -34,10 +34,10 @@
 
 ## 📦 Installation
 
-Install `sortui` directly from PyPI. A Python `3.10+` environment is required.
+Install `sort-tui` directly from PyPI. A Python `3.10+` environment is required.
 
 ```bash
-pip install sortui
+pip install sort-tui
 ```
 
 > [!TIP]
