@@ -9,7 +9,7 @@
 [![CI](https://img.shields.io/github/actions/workflow/status/yourusername/sortui/ci.yml?branch=main&style=for-the-badge&logo=github)](https://github.com/yourusername/sortui/actions)
 [![PyPI version](https://img.shields.io/pypi/v/sortui?style=for-the-badge&logo=pypi&logoColor=white)](https://pypi.org/project/sortui/)
 
-![sort-tui Demo](https://via.placeholder.com/800x450/1a1b26/7aa2f7?text=Interactive+Terminal+Visualization+Demo)
+![sort-tui Demo](docs/assets/demo.svg)
 
 </div>
 
