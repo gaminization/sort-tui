@@ -1,149 +1,110 @@
-# sortui
+<div align="center">
 
-[![CI](https://github.com/yourusername/sortui/actions/workflows/ci.yml/badge.svg)](https://github.com/yourusername/sortui/actions/workflows/ci.yml)
-[![Python Version](https://img.shields.io/pypi/pyversions/sortui)](https://pypi.org/project/sortui/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![PyPI version](https://badge.fury.io/py/sortui.svg)](https://badge.fury.io/py/sortui)
+# 📊 sort-tui
 
-A high-performance, purely terminal-based educational visualizer for 110 sorting algorithms.
+**A high-performance, purely terminal-based educational visualizer for 149 sorting algorithms.**
 
-## Installation
+[![Python Version](https://img.shields.io/pypi/pyversions/sortui?style=for-the-badge&logo=python&logoColor=white)](https://pypi.org/project/sortui/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
+[![CI](https://img.shields.io/github/actions/workflow/status/yourusername/sortui/ci.yml?branch=main&style=for-the-badge&logo=github)](https://github.com/yourusername/sortui/actions)
+[![PyPI version](https://img.shields.io/pypi/v/sortui?style=for-the-badge&logo=pypi&logoColor=white)](https://pypi.org/project/sortui/)
+
+![sort-tui Demo](https://via.placeholder.com/800x450/1a1b26/7aa2f7?text=Interactive+Terminal+Visualization+Demo)
+
+</div>
+
+<br/>
+
+> [!NOTE]
+> `sort-tui` is built entirely on standard libraries (`curses`), meaning **zero dependencies** and instant execution on any POSIX system. 
+
+## ✨ Features
+
+| Feature | Description |
+| :--- | :--- |
+| 📚 **Massive Catalog** | Over **149** unique sorting algorithms, from QuickSort to Bogosort. |
+| 🚀 **High Performance** | O(1) latency frame-by-frame rendering using Python generators. |
+| 🎵 **Audio Mapping** | Hear the arrays sort with dynamic PCM audio pitch mapping. |
+| 🆚 **Comparison Mode** | Run multiple algorithms side-by-side in split panes. |
+| 📊 **Benchmarking** | Headless execution mode for gathering raw computational metrics. |
+| 🎨 **Rich Visuals** | 7 different rendering modes (Bars, Dots, Spiral, Circular, etc.). |
+| 🧩 **Extensible** | Drop-in community plugin support for custom algorithms. |
+
+---
+
+## 📦 Installation
+
+Install `sortui` directly from PyPI. A Python `3.10+` environment is required.
 
 ```bash
 pip install sortui
 ```
 
-## Quick Start
+> [!TIP]
+> For Windows users, `curses` is not natively supported by `cmd`. We recommend running `sort-tui` inside **WSL**, or manually installing `windows-curses` (`pip install windows-curses`).
+
+## 🚀 Quick Start
+
+Launch an interactive visualization immediately:
 
 ```bash
-# Visualize a standard Bubble Sort interactively
+# Visualize a standard Bubble Sort
 sortui --algorithm bubble
 
-# Test TimSort on a nearly sorted array
+# Test TimSort on a nearly sorted array of 100 elements
 sortui --algorithm timsort --distribution nearly_sorted --size 100
 
 # Compare Quicksort, Merge Sort, and Heapsort side-by-side
 sortui --compare quicksort merge heapsort
 
-# Run headless benchmarking
+# Run a headless benchmark suite
 sortui --benchmark bubble insertion quicksort --size 500
 ```
 
-## Hotkeys
+## ⌨️ Interactive Hotkeys
 
-`sortui` is fully interactive during a visualization. 
+`sort-tui` is fully interactive during playback. 
 
-| Key(s) | Action |
-| --- | --- |
-| `SPACE` | Pause / Resume |
-| `→` / `←` | Step forward / backward one frame (paused) |
-| `Shift+→` / `Shift+←` | Jump forward / backward 10 frames (paused) |
-| `Ctrl+→` | Jump to next swap |
-| `R` | Reload with a new random array |
-| `Shift+R` | Restart current algorithm with the exact same starting array |
-| `+` / `-` | Increase / Decrease simulation speed |
-| `1` - `9` | Speed presets (1=slow, 9=fastest) |
-| `A` | Toggle ascending / descending order target |
-| `V` | Cycle visualization mode (Bars, Dots, etc.) |
-| `H` | Toggle heatmap overlay (tracks array access frequency) |
-| `M` | Toggle audio (pitch mapping based on array values) |
-| `D` | Cycle input array distribution |
-| `C` | Toggle side-by-side comparison mode |
-| `S` | Toggle stability tracking |
-| `E` | Export buffered run as a JSON replay |
-| `G` | Toggle behavioral fingerprint panel (Algorithm Genome) |
-| `?` | Toggle help panel |
-| `Q` / `ESC` | Quit |
+| Key(s) | Action | Key(s) | Action |
+| :--- | :--- | :--- | :--- |
+| `SPACE` | Pause / Resume | `A` | Toggle Ascending / Descending |
+| `→` / `←` | Step forward / backward 1 frame | `V` | Cycle Visualization Mode |
+| `Shift+→`/`←`| Jump forward / backward 10 frames| `H` | Toggle Heatmap Overlay |
+| `Ctrl+→` | Jump to next swap | `M` | Toggle Audio |
+| `R` | Reload with new random array | `D` | Cycle Input Distribution |
+| `Shift+R` | Restart exact same array | `C` | Toggle Comparison Mode |
+| `+` / `-` | Adjust simulation speed | `S` | Toggle Stability Tracking |
+| `1` - `9` | Speed presets (1=slow, 9=fastest) | `E` | Export replay as JSON |
+| `G` | Toggle Algorithm Genome panel | `?` | Toggle Help Panel |
+| `Q` / `ESC` | Quit application | | |
 
-## Visualization Modes
+## 📚 Documentation
 
-Press `V` during playback to cycle through these render styles.
+Dive deeper into the inner workings, advanced configuration, and data science metrics of `sort-tui`:
 
-| Mode | Description |
-| --- | --- |
-| `bars` | Standard vertical bar chart (height proportional to value). |
-| `dots` | Single dot plotted at the tip of where the bar would be. |
-| `horizontal` | Horizontal bar chart flowing downwards. |
-| `numbers` | Renders the last digit of the value at the tip of the bar. |
-| `waveform` | Connects the tips of the bars to form a continuous line graph. |
-| `spiral` | Plots elements as a density-mapped spiral point cloud. |
-| `circular` | Renders the array in a circular clock-face orientation. |
+- [Algorithm Contract & Architecture](docs/algorithms.md)
+- [Performance Benchmarks](docs/benchmarks.md)
+- [Advanced Features (Replay, Audio, Fingerprinting)](docs/advanced_features.md)
+- [Configuration & Profiles](docs/configuration.md)
+- [Plugin Guide (Write your own sorts!)](docs/plugin_guide.md)
 
-## Input Distributions
+## 🏗 Tech Stack
 
-Press `D` or pass `--distribution` to alter the array structure before sorting.
+| Technology | Rationale |
+| :--- | :--- |
+| **`curses`** | Chosen for its zero-dependency footprint. Ensures instant execution without bloated TUI libraries. |
+| **Python Generators** | Yielding `SortFrame` objects natively preserves the function call stack and local state for O(1) rewinding. |
+| **`tomllib`** | Standard library configuration parsing (no external `toml` or `yaml` packages required). |
+| **`argparse`** | Native CLI argument parsing allowing rich help texts and subcommands. |
 
-| Distribution | Description |
-| --- | --- |
-| `random` | Uniformly distributed random integers. |
-| `sorted` | Already sorted in ascending order. |
-| `reverse` | Already sorted in descending order. |
-| `nearly_sorted` | Sorted array with 5% of elements randomly displaced. |
-| `few_unique` | An array composed of only 5 unique distinct values. |
-| `gaussian` | Normally distributed values clustered around the median. |
-| `sawtooth` | Repeating ascending sequences of small periods. |
-| `pipe_organ` | Ascending then descending values shaped like an arch. |
-| `shuffled_median` | Median extracted values with 20% random shuffle. |
-| `worst_case` | An algorithm-specific worst-case input topology. |
-| `custom` | A user-defined CSV array passed via CLI `--custom`. |
+## 🤝 Contributing & Community
 
-## Algorithm Catalog
+We welcome contributions of all sizes! Whether it's adding a new esoteric sorting algorithm, fixing a bug, or improving the visuals.
 
-`sortui` bundles 110 unique sorting algorithms organized into academic categories.
+- Please read our [Contributing Guidelines](CONTRIBUTING.md) to get started.
+- Check out the [Roadmap](ROADMAP.md) to see where the project is heading.
+- Review our [Code of Conduct](CODE_OF_CONDUCT.md).
 
-| Category | Count |
-| --- | --- |
-| Simple Sorts | 9 |
-| Efficient Sorts | 13 |
-| Hybrid Sorts | 5 |
-| Non-Comparison Sorts | 10 |
-| Adaptive Sorts | 9 |
-| External Sorts | 6 |
-| Parallel Sorts | 10 |
-| String-Specific Sorts | 4 |
-| Numerical Sorts | 4 |
-| Sorting Networks | 3 |
-| Hybrid Variants | 7 |
-| Other Sorts | 6 |
-| Specialized / Joke Sorts | 24 |
+## 📄 License
 
-## Benchmarks
-
-Results of `sortui --benchmark <algorithms> --size 500 --seed 42`:
-
-| Algorithm | Time(ms) | Comparisons | Swaps | Writes | Frames |
-| --- | --- | --- | --- | --- | --- |
-| counting | 9.001 | 0 | 0 | 500 | 1,501 |
-| radix_msd | 25.467 | 0 | 0 | 1,498 | 2,997 |
-| radix_lsd | 25.501 | 0 | 0 | 1,500 | 3,001 |
-| quicksort | 93.055 | 4,575 | 2,019 | 0 | 6,925 |
-| bucket | 97.112 | 3,231 | 0 | 3,787 | 7,997 |
-| introsort | 105.486 | 4,430 | 1,480 | 1,579 | 7,901 |
-| merge | 114.212 | 3,849 | 0 | 4,492 | 8,342 |
-| dual_pivot_quicksort | 131.000 | 4,808 | 0 | 4,852 | 10,140 |
-| comb | 141.879 | 9,370 | 1,848 | 0 | 11,219 |
-| pdqsort | 143.260 | 6,624 | 3,200 | 197 | 10,065 |
-| shellsort | 158.952 | 5,633 | 0 | 5,876 | 14,482 |
-| heapsort | 167.553 | 7,462 | 4,070 | 0 | 11,533 |
-| timsort | 272.860 | 10,077 | 0 | 10,095 | 20,665 |
-| adaptive_merge | 642.940 | 21,502 | 0 | 25,401 | 46,905 |
-| selection | 1382.751 | 124,750 | 500 | 0 | 125,251 |
-| insertion | 1665.994 | 61,682 | 0 | 61,687 | 123,869 |
-| cocktail_shaker | 2300.964 | 92,365 | 61,188 | 0 | 153,554 |
-| bubble | 2656.198 | 124,659 | 61,188 | 0 | 185,848 |
-
-## Tech Stack
-
-| Technology | Reason Used |
-| --- | --- |
-| `curses` | Chosen for its Zero-Dependency footprint ensuring instant execution on any POSIX system without installing bloated 3rd party TUI libraries. |
-| Python `generators` | Yielding `SortFrame` objects from algorithms natively preserves the function call stack and state, making visualization frame-by-frame O(1) latency. |
-| `tomllib` | Standard library configuration parsing (no external `toml` or `yaml` dependencies). |
-| `argparse` | Native CLI argument parsing allowing rich help texts and subcommands without needing `click` or `typer`. |
-
-## Known Limitations
-
-- **Time Travel RAM Usage**: Navigating backwards requires an in-memory buffer of previous `SortFrame` yields. For very slow `O(n^2)` algorithms on large arrays (`size > 1000`), RAM usage can grow.
-- **Audio Cross-Platform Support**: Audio generation via ALSA/SoX is primarily built for Linux. Mac and Windows environments may silently bypass the audio system if standard drivers aren't found.
-- **Terminal Sizing**: The UI requires a minimum dimension of `20x10`. Extremely small pane tiling will pause the visualization with a warning until resized.
-- **Windows Support**: Native Windows `cmd` does not ship `curses` by default. Windows users must run via WSL or manually `pip install windows-curses`.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
