@@ -37,11 +37,15 @@ class SwapSort(SortAlgorithm):
                     yield _base_frame(arr, highlighted=[i, j], explanation=f"Counting elements smaller than arr[{i}]")
                     if (arr[j] < arr[i]) if ascending else (arr[j] > arr[i]):
                         count += 1
-                    elif arr[j] == arr[i] and j < i:
-                        count += 1
                 if count == i:
                     break
                 target = count
+                while target < n and arr[target] == arr[i]:
+                    if target == i:
+                        break
+                    target += 1
+                if target == i:
+                    break
                 yield _base_frame(arr, highlighted=[i, target], explanation=f"Swapping to target position {target}")
                 arr[i], arr[target] = arr[target], arr[i]
                 yield _base_frame(arr, swapped=[i, target], operation="swap")
