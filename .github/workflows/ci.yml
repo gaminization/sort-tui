@@ -58,10 +58,10 @@ jobs:
           "
 
       - name: CLI List Gate
-        run: sortui --list
+        run: sort-tui --list
 
       - name: CLI Version Gate
-        run: sortui --version
+        run: sort-tui --version
 
       - name: CLI Benchmark Gate
-        run: sortui --benchmark bubble insertion --size 30 --seed 42
+        run: sort-tui --benchmark bubble insertion --size 30 --seed 42

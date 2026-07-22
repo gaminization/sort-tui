@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.6] - 2026-07-22
+
+### Fixed
+- Fixed CI failure caused by the `sortui` -> `sort-tui` CLI renaming in the previous release.
+- Removed the failing GitHub Actions CI badge from the `README.md`.
+
 ## [0.1.5] - 2026-07-22
 
 ### Fixed
@@ -48,6 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Fixed memory leakage in time-travel buffers for large dataset `O(n^2)` algorithms.
 
+[0.1.6]: https://github.com/gaminization/sort-tui/releases/tag/v0.1.6
 [0.1.5]: https://github.com/gaminization/sort-tui/releases/tag/v0.1.5
 [0.1.4]: https://github.com/gaminization/sort-tui/releases/tag/v0.1.4
 [0.1.3]: https://github.com/gaminization/sort-tui/releases/tag/v0.1.3
