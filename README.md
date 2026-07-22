@@ -8,7 +8,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 [![CI](https://img.shields.io/github/actions/workflow/status/gaminization/sort-tui/ci.yml?branch=main&style=for-the-badge&logo=github)](https://github.com/gaminization/sort-tui/actions)
 
-![sort-tui Demo](docs/assets/demo.svg)
+![sort-tui Demo](docs/assets/demo.gif)
 
 </div>
 
