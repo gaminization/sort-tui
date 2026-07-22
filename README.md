@@ -4,6 +4,7 @@
 
 **A high-performance, purely terminal-based educational visualizer for 149 sorting algorithms.**
 
+[![PyPI Version](https://img.shields.io/pypi/v/sort-tui.svg?style=for-the-badge&logo=pypi)](https://pypi.org/project/sort-tui/)
 [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 [![CI](https://img.shields.io/github/actions/workflow/status/gaminization/sort-tui/ci.yml?branch=main&style=for-the-badge&logo=github)](https://github.com/gaminization/sort-tui/actions)
