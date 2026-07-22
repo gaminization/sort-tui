@@ -11,7 +11,7 @@ from sortui.algorithms.base import SortFrame
 
 def default_export_path() -> Path:
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    return Path.home() / f"sortui_run_{stamp}.json"
+    return Path.home() / f"sort-tui_run_{stamp}.json"
 
 
 def _jsonable(value: Any) -> Any:
@@ -42,7 +42,7 @@ def export_run(engine, algorithm, stats, path: str | Path | None = None) -> Path
     out_path.parent.mkdir(parents=True, exist_ok=True)
     frames = getattr(engine, "_history", [])
     payload = {
-        "format": "sortui-run-v1",
+        "format": "sort-tui-run-v1",
         "algorithm": getattr(algorithm, "name", type(algorithm).__name__),
         "algorithm_key": getattr(algorithm, "key", None),
         "stats": {

@@ -21,7 +21,7 @@ def test_list_exits_zero():
 def test_version_exits_zero():
     result = run_cli("--version")
     assert result.returncode == 0
-    assert "sortui" in result.stdout
+    assert "sort-tui" in result.stdout
 
 
 def test_unknown_algorithm_has_helpful_message():

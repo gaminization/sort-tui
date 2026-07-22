@@ -32,7 +32,7 @@ class TestChallengeMenu:
 
     def test_menu_has_header(self):
         menu = challenge_menu()
-        assert "sortui" in menu.lower()
+        assert "sort-tui" in menu.lower()
 
     def test_menu_shows_size(self):
         menu = challenge_menu()

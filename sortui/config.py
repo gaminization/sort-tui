@@ -176,7 +176,7 @@ class SortuiConfig:
     """Loaded and validated configuration."""
 
     def __init__(self, path: Path | None = None):
-        self._path = path or Path.home() / ".config" / "sortui" / "config.toml"
+        self._path = path or Path.home() / ".config" / "sort-tui" / "config.toml"
         self._raw: dict[str, Any] = {}
         self._load()
 

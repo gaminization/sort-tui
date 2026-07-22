@@ -8,7 +8,7 @@ from typing import Type
 
 from sortui.algorithms.base import SortAlgorithm
 
-PLUGIN_DIR = Path.home() / ".config" / "sortui" / "plugins"
+PLUGIN_DIR = Path.home() / ".config" / "sort-tui" / "plugins"
 COMMUNITY_CATEGORY = "Community"
 
 

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sort-tui"
-version = "0.1.3"
+version = "0.1.4"
 description = "Terminal visualiser for sorting algorithms"
 readme = "README.md"
 license = {file = "LICENSE"}
@@ -29,7 +29,6 @@ classifiers = [
 dev = ["pytest", "pytest-cov", "pre-commit", "ruff", "mypy", "build"]
 
 [project.scripts]
-sortui = "sortui.__main__:main"
 sort-tui = "sortui.__main__:main"
 
 [project.urls]

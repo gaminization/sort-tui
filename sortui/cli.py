@@ -16,20 +16,20 @@ MAX_BENCHMARK_SIZE = 100_000
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="sortui",
+        prog="sort-tui",
         description="Terminal visualiser for sorting algorithms",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  sortui                                     # launch with defaults
-  sortui -a insertion -s 2.0                 # insertion sort at 2x speed
-  sortui -a bubble -n 60                     # bubble sort with 60 elements
-  sortui --list                              # list all algorithms
-  sortui --order desc                        # sort descending
-  sortui --distribution nearly_sorted -n 80  # nearly-sorted input, 80 elements
-  sortui --seed 42 -a selection              # reproducible run
-  sortui --input "5,3,1,4,2"                # visualise a custom array
-  sortui --profile teaching                  # load teaching profile from config
+  sort-tui                                     # launch with defaults
+  sort-tui -a insertion -s 2.0                 # insertion sort at 2x speed
+  sort-tui -a bubble -n 60                     # bubble sort with 60 elements
+  sort-tui --list                              # list all algorithms
+  sort-tui --order desc                        # sort descending
+  sort-tui --distribution nearly_sorted -n 80  # nearly-sorted input, 80 elements
+  sort-tui --seed 42 -a selection              # reproducible run
+  sort-tui --input "5,3,1,4,2"                # visualise a custom array
+  sort-tui --profile teaching                  # load teaching profile from config
         """,
     )
 
@@ -169,7 +169,7 @@ Examples:
         const="",
         default=None,
         metavar="PATH",
-        help="Run once, export frames to JSON, and exit (default: ~/sortui_run_<timestamp>.json)",
+        help="Run once, export frames to JSON, and exit (default: ~/sort-tui_run_<timestamp>.json)",
     )
     parser.add_argument(
         "--replay",
@@ -204,7 +204,7 @@ Examples:
     parser.add_argument(
         "--version",
         action="version",
-        version=f"sortui {__version__}",
+        version=f"sort-tui {__version__}",
     )
 
     return parser
@@ -284,7 +284,7 @@ def main() -> None:
         # Construct a bare config that will use all defaults
         cfg = SortuiConfig.__new__(SortuiConfig)
         cfg._raw = {}
-        cfg._path = Path.home() / ".config" / "sortui" / "config.toml"
+        cfg._path = Path.home() / ".config" / "sort-tui" / "config.toml"
 
     # ── Apply profile (CLI > profile > config > hard-coded default) ────────
     profile_overrides: dict = {}
@@ -401,7 +401,7 @@ def main() -> None:
         print(
             f"Error: unknown algorithm {algorithm_key!r}.\n"
             f"Available: {available}\n"
-            f"Run `sortui --list` for a full listing.",
+            f"Run `sort-tui --list` for a full listing.",
             file=sys.stderr,
         )
         sys.exit(1)

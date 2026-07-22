@@ -6,7 +6,7 @@ from pathlib import Path
 
 from sortui.benchmark import run_benchmark
 
-SCORE_PATH = Path.home() / ".config" / "sortui" / "scores.json"
+SCORE_PATH = Path.home() / ".config" / "sort-tui" / "scores.json"
 
 
 @dataclass(frozen=True)
@@ -82,7 +82,7 @@ def run_challenge(
 
 
 def challenge_menu() -> str:
-    lines = ["sortui challenges"]
+    lines = ["sort-tui challenges"]
     for idx, challenge in enumerate(CHALLENGES, start=1):
         constraints = []
         if challenge.max_swaps is not None:

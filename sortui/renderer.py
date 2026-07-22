@@ -215,7 +215,7 @@ class Renderer:
         pause_flag = "  ⏸ PAUSED" if paused else ""
         alg_name = getattr(algorithm, "name", type(algorithm).__name__)
         header_str = (
-            f" sortui │ {alg_name} │ n={n} │ {order_str} │ "
+            f" sort-tui │ {alg_name} │ n={n} │ {order_str} │ "
             f"{speed:.1f}x │ {distribution} │ frame {frame_num}"
             f"{pause_flag} "
         )
