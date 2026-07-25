@@ -11,11 +11,11 @@ We currently provide security updates for the following versions:
 
 ## Reporting a Vulnerability
 
-Security is a priority for the `sort-tui` team. If you discover a vulnerability, we would like to know about it so we can take steps to address it as quickly as possible.
+Security is a priority for `sort-tui`. If you discover a vulnerability, we would like to know about it so we can take steps to address it as quickly as possible.
 
 **Please do not report security vulnerabilities through public GitHub issues.**
 
-Instead, please report them via email to **security@example.com** (replace with actual security email or use GitHub Security Advisories).
+Instead, please report them via GitHub Security Advisories.
 
 ### What to include in your report:
 
@@ -25,4 +25,4 @@ Instead, please report them via email to **security@example.com** (replace with 
 - Step-by-step instructions to reproduce the issue.
 - Proof-of-concept or exploit code (if possible).
 
-You should receive a response within 48 hours. If you do not hear back, please reach out directly to the core maintainers.
+You should receive a response within 48 hours. If you do not hear back, please reach out directly to the maintainers.
