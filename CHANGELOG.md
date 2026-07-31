@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.7] - 2026-07-31
+
+### Changed
+- **Repository Restructuring**: Cleaned up the repository root to be more professional.
+- Moved `CONTRIBUTING.md` and `CODE_OF_CONDUCT.md` into the `.github/` folder to reduce top-level clutter.
+- Removed unused and obsolete boilerplate files (`ROADMAP.md`, `SECURITY.md`).
+
 ## [0.1.6] - 2026-07-22
 
 ### Fixed
@@ -54,6 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Fixed memory leakage in time-travel buffers for large dataset `O(n^2)` algorithms.
 
+[0.1.7]: https://github.com/gaminization/sort-tui/releases/tag/v0.1.7
 [0.1.6]: https://github.com/gaminization/sort-tui/releases/tag/v0.1.6
 [0.1.5]: https://github.com/gaminization/sort-tui/releases/tag/v0.1.5
 [0.1.4]: https://github.com/gaminization/sort-tui/releases/tag/v0.1.4
